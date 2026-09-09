@@ -1,11 +1,11 @@
 @props(['sidebar' => false])
 
 <a {{ $attributes->class(['flex min-w-0 items-center gap-3 rounded-xl']) }}>
-    <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-300 text-[0.65rem] font-black tracking-tight text-barangay-950 ring-4 ring-white/10">
+    <span class="flex size-11 shrink-0 items-center justify-center rounded-full text-xs font-black text-[#0b2d20] shadow-[0_0_0_4px_rgba(255,255,255,0.08)]" style="background: radial-gradient(circle at 35% 30%, #e7d99e, #c5a348 58%, #8f772e);">
         BSF
     </span>
     <span class="min-w-0">
-        <span class="block truncate text-sm font-bold {{ $sidebar ? 'text-white' : 'text-slate-950 dark:text-white' }}">Barangay Sta. Felomina</span>
-        <span class="mt-0.5 block truncate text-[0.68rem] {{ $sidebar ? 'text-emerald-100/70' : 'text-slate-500 dark:text-slate-400' }}">Records & Verification</span>
+        <strong class="block truncate text-sm font-bold tracking-[0.02em] {{ $sidebar ? 'text-white' : 'text-slate-950 dark:text-white' }}">Sta. Felomina</strong>
+        <span class="mt-0.5 block truncate text-[11px] {{ $sidebar ? 'text-[#bad2c4]' : 'text-slate-500 dark:text-slate-400' }}">Records &amp; Verification</span>
     </span>
 </a>

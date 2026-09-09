@@ -56,7 +56,7 @@ guarantees. Confirm installed versions again before using version-sensitive APIs
 | CSS/build | Tailwind CSS 4; Vite Plus scripts (`vp`) |
 | Tests | Pest 5.1.4 with Laravel plugin 5.0.1 |
 | Static analysis | Larastan 3.11.0 / `phpstan.neon` |
-| Local/default data store | SQLite |
+| Local/default data store | PostgreSQL 16 |
 
 Useful project commands:
 
@@ -79,6 +79,7 @@ pipeline also checks formatting and static analysis.
 | D-002 | The HTML prototype is visual reference only; code and tests determine implementation status | Prototype labels its actions/sample data as prototype-only | 2026-09-09 |
 | D-003 | Coordination files have non-overlapping roles: operating contract, scope audit, durable memory, and current handoff | AI-native workflow design | 2026-09-09 |
 | D-004 | Progress is reported by evidence-backed statuses, not invented percentages | Avoids false precision and repeated re-auditing | 2026-09-09 |
+| D-005 | Root `AGENTS.md` contains only cross-cutting rules; detailed framework guidance loads through skills and path-scoped `.ai/rules` | Reduces recurring context while preserving task-specific guidance | 2026-09-09 |
 
 ## Memory Maintenance
 

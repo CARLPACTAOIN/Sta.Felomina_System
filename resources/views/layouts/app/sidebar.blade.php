@@ -6,7 +6,7 @@
     <body class="min-h-screen bg-[#f4f7f5] antialiased dark:bg-slate-950">
         @php($role = auth()->user()->role)
 
-        <flux:sidebar sticky collapsible="mobile" class="border-e-0! bg-barangay-950! text-white shadow-xl shadow-barangay-950/10">
+        <flux:sidebar sticky collapsible="mobile" class="border-e-0! bg-[linear-gradient(180deg,#0b2d20,#0f3e2d_68%,#164933)]! text-white shadow-xl shadow-barangay-950/10">
             <flux:sidebar.header class="border-b border-white/10 pb-4">
                 <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
                 <flux:sidebar.collapse class="lg:hidden" />
@@ -56,30 +56,49 @@
                         @endif
                     </flux:sidebar.group>
                 @endif
+
+                @if (Route::has('verification.preview'))
+                    <flux:sidebar.group :heading="__('Preview')" class="mt-5 [&_[data-flux-sidebar-group-heading]]:text-emerald-200/60">
+                        <flux:sidebar.item icon="qr-code" :href="route('verification.preview', ['state' => 'published'])" :current="request()->routeIs('verification.preview')" wire:navigate>
+                            {{ __('Public Verification') }}
+                        </flux:sidebar.item>
+                    </flux:sidebar.group>
+                @endif
             </flux:sidebar.nav>
 
             <flux:spacer />
 
-            <flux:sidebar.nav class="border-t border-white/10 pt-4">
-                <flux:sidebar.item icon="bell" :href="route('notifications.index')" :current="request()->routeIs('notifications.*')" wire:navigate>
-                    {{ __('Notifications') }}
-                </flux:sidebar.item>
-                <flux:sidebar.item icon="cog-6-tooth" :href="route('profile.edit')" :current="request()->routeIs('profile.edit', 'security.edit', 'appearance.edit')" wire:navigate>
-                    {{ __('My Account') }}
-                </flux:sidebar.item>
-            </flux:sidebar.nav>
-
-            <x-desktop-user-menu class="hidden lg:block" />
+            <div class="mt-auto border-t border-white/10 pt-3">
+                <x-desktop-user-menu />
+            </div>
         </flux:sidebar>
 
-        <flux:header class="border-b border-slate-200/80 bg-white/90 backdrop-blur lg:hidden dark:border-slate-800 dark:bg-slate-950/90">
-            <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
-            <div class="min-w-0">
-                <p class="truncate text-sm font-semibold text-slate-950 dark:text-white">{{ config('app.name') }}</p>
-                <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $role->label() }}</p>
+        <flux:header class="sticky top-0 z-15 min-h-[74px] border-b border-[#e2e8e4] bg-white/88 px-4 backdrop-blur-md sm:px-8 dark:border-slate-800 dark:bg-slate-950/90">
+            <div class="flex items-center gap-3">
+                <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
+                <div class="min-w-0">
+                    <h1 class="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-xl dark:text-white">
+                        {{ $title ?? __('Dashboard') }}
+                    </h1>
+                    <div class="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                        Barangay Sta. Felomina • {{ now()->translatedFormat('l, F j, Y') }}
+                    </div>
+                </div>
             </div>
+
             <flux:spacer />
-            <flux:button variant="ghost" size="sm" icon="bell" :href="route('notifications.index')" wire:navigate :aria-label="__('Notifications')" />
+
+            <div class="flex items-center gap-2.5">
+                <a
+                    href="{{ route('notifications.index') }}"
+                    wire:navigate
+                    class="relative flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+                    aria-label="{{ __('Notifications') }}"
+                >
+                    <flux:icon.bell class="size-[18px]" />
+                    <span class="absolute right-2 top-2 size-2 rounded-full border-2 border-white bg-[#d65a52] dark:border-slate-800"></span>
+                </a>
+            </div>
         </flux:header>
 
         {{ $slot }}

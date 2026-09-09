@@ -9,7 +9,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-    --font-sans: 'Instrument Sans', 'Segoe UI', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Inter', 'Segoe UI', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
     --color-barangay-50: #eef8f2;
     --color-barangay-100: #dff1e7;
@@ -131,6 +131,61 @@ select:focus[data-flux-control] {
     }
 }
 
-/* \[:where(&)\]:size-4 {
-    @apply size-4;
-} */
+/* Prototype sidebar styles & interactive states */
+[data-flux-sidebar] {
+    background: linear-gradient(180deg, #0b2d20, #0f3e2d 68%, #164933) !important;
+    color: #ffffff !important;
+}
+
+[data-flux-sidebar] [data-flux-sidebar-group-heading] {
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.13em !important;
+    color: #90b29f !important;
+    font-weight: 800 !important;
+    padding: 14px 12px 6px !important;
+}
+
+[data-flux-sidebar] [data-flux-sidebar-item] {
+    color: #cfe0d6 !important;
+    border-radius: 11px !important;
+    padding: 9px 12px !important;
+    font-size: 13px !important;
+    font-weight: 650 !important;
+    border: 1px solid transparent !important;
+    background-color: transparent !important;
+    transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+[data-flux-sidebar] [data-flux-sidebar-item] svg {
+    color: currentColor !important;
+}
+
+[data-flux-sidebar] [data-flux-sidebar-item]:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #ffffff !important;
+}
+
+[data-flux-sidebar] [data-flux-sidebar-item]:hover svg {
+    color: #ffffff !important;
+}
+
+[data-flux-sidebar] [data-flux-sidebar-item][data-current],
+[data-flux-sidebar] [data-flux-sidebar-item][data-active] {
+    background-color: #ffffff !important;
+    color: #103b2b !important;
+    font-weight: 700 !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16) !important;
+    border-color: transparent !important;
+}
+
+[data-flux-sidebar] [data-flux-sidebar-item][data-current] svg,
+[data-flux-sidebar] [data-flux-sidebar-item][data-active] svg {
+    color: #103b2b !important;
+}
+
+[data-flux-sidebar] [data-flux-sidebar-item][data-current]:hover,
+[data-flux-sidebar] [data-flux-sidebar-item][data-active]:hover {
+    background-color: #ffffff !important;
+    color: #103b2b !important;
+}

@@ -8,6 +8,26 @@
 
 ---
 
+## Agent Context Map
+
+Use headings rather than line numbers because this document will evolve. For an
+ordinary implementation task, load the cross-cutting rules in §33, the relevant
+domain section, its workflow in §34, and its acceptance criteria in §35. Load the
+entire PRD only for cross-cutting architecture, scope reconciliation, or a full
+product audit.
+
+| Task | Sections to load |
+|---|---|
+| Product orientation or scope | §1-8, §33, §37, §40 |
+| Authentication, accounts, or authorization | §7-9, §21, §25.2, §33, §35.1 |
+| Documents, files, QR, approval, or search | §10-15, §17-18, §24-26, §34.1, §34.3-34.4, §35.2-35.4 |
+| Categorization | §16, §25.1, §34.2, §35.5 |
+| Residents, households, or purok isolation | §19-21, §25.3, §26.3, §34.5, §35.6 |
+| Dashboards or reports | §18, §22-23, §35.7 |
+| Audit logging | §25, §33, §35.8 |
+| Backup, deployment, training, or turnover | §27-31, §36 |
+| Requirement change or final audit | §4-6, §33-40 plus every affected domain section |
+
 ## 1. Document Purpose
 
 This PRD defines the intended behavior, scope, rules, workflows, roles, data requirements, and acceptance criteria of the system.

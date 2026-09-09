@@ -1,16 +1,22 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Http\Controllers\DocumentRecordController;
+use App\Http\Controllers\DocumentVerificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login')->name('home');
+
+Route::get('verify/{token}', DocumentVerificationController::class)
+    ->where('token', '[A-Za-z0-9]+')
+    ->name('verification.show');
 
 Route::middleware(['auth', 'active', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
 
     Route::middleware('role:'.UserRole::Captain->value.','.UserRole::Secretary->value)->group(function () {
-        Route::view('documents', 'documents.index')->name('documents.index');
-        Route::view('documents/create', 'documents.create')->name('documents.create');
+        Route::get('documents', [DocumentRecordController::class, 'index'])->name('documents.index');
+        Route::livewire('documents/create', 'pages::documents.create')->name('documents.create');
         Route::view('approvals', 'approvals.index')->name('approvals.index');
         Route::view('categorization-rules', 'categorization-rules.index')->name('categorization-rules.index');
     });
