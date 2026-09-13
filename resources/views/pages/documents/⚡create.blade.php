@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\UserRole;
+use App\Actions\Documents\SuggestDocumentCategory;
 use App\Models\DocumentCategory;
 use App\Models\DocumentRecord;
 use App\Models\DocumentType;
@@ -19,12 +19,18 @@ new #[Title('Create Document Record')] class extends Component
 {
     public string $documentTypeId = '';
     public string $documentCategoryId = '';
+    public ?int $suggestedDocumentCategoryId = null;
+    public ?int $categorySuggestionRuleId = null;
+    /** @var array<int, string> */
+    public array $categorySuggestionTerms = [];
+    public ?string $categorySuggestionReason = null;
     public string $documentNumber = '';
     public string $title = '';
     public string $documentDate = '';
     public string $subject = '';
     public string $keywords = '';
     public bool $documentNumberWasEdited = false;
+    public bool $documentCategoryWasEdited = false;
 
     public function mount(): void
     {
@@ -34,6 +40,7 @@ new #[Title('Create Document Record')] class extends Component
     public function updatedDocumentTypeId(): void
     {
         $this->refreshSuggestedDocumentNumber();
+        $this->refreshSuggestedCategory();
     }
 
     public function updatedDocumentDate(): void
@@ -46,10 +53,40 @@ new #[Title('Create Document Record')] class extends Component
         $this->documentNumberWasEdited = filled($this->documentNumber);
     }
 
+    public function updatedTitle(): void
+    {
+        $this->refreshSuggestedCategory();
+    }
+
+    public function updatedSubject(): void
+    {
+        $this->refreshSuggestedCategory();
+    }
+
+    public function updatedKeywords(): void
+    {
+        $this->refreshSuggestedCategory();
+    }
+
+    public function updatedDocumentCategoryId(): void
+    {
+        $this->documentCategoryWasEdited = filled($this->documentCategoryId);
+    }
+
     public function useSuggestedDocumentNumber(): void
     {
         $this->documentNumberWasEdited = false;
         $this->refreshSuggestedDocumentNumber(force: true);
+    }
+
+    public function useSuggestedCategory(): void
+    {
+        if ($this->suggestedDocumentCategoryId === null) {
+            return;
+        }
+
+        $this->documentCategoryWasEdited = false;
+        $this->documentCategoryId = (string) $this->suggestedDocumentCategoryId;
     }
 
     public function save(): RedirectResponse
@@ -57,6 +94,8 @@ new #[Title('Create Document Record')] class extends Component
         $user = Auth::user();
 
         abort_unless($user instanceof User && $user->role->canManageDocuments(), 403);
+
+        $this->refreshSuggestedCategory();
 
         $validated = $this->validate([
             'documentTypeId' => [
@@ -98,6 +137,13 @@ new #[Title('Create Document Record')] class extends Component
         $document = DocumentRecord::create([
             'document_type_id' => (int) $validated['documentTypeId'],
             'document_category_id' => (int) $validated['documentCategoryId'],
+            'suggested_document_category_id' => $this->suggestedDocumentCategoryId,
+            'category_suggestion_rule_id' => $this->categorySuggestionRuleId,
+            'category_suggestion_terms' => $this->categorySuggestionTerms === [] ? null : $this->categorySuggestionTerms,
+            'category_suggestion_reason' => $this->categorySuggestionReason,
+            'category_suggested_at' => $this->suggestedDocumentCategoryId === null ? null : now(),
+            'category_overridden_at' => $this->categoryWasOverridden((int) $validated['documentCategoryId']) ? now() : null,
+            'category_overridden_by_id' => $this->categoryWasOverridden((int) $validated['documentCategoryId']) ? $user->id : null,
             'created_by_id' => $user->id,
             'document_number' => $validated['documentNumber'],
             'document_year' => $documentYear,
@@ -107,10 +153,27 @@ new #[Title('Create Document Record')] class extends Component
             'keywords' => filled($validated['keywords'] ?? null) ? $validated['keywords'] : null,
         ]);
 
+        if ($this->suggestedDocumentCategoryId !== null) {
+            $document->recordAudit($user, 'document_category_suggested', 'Document category suggested.', [
+                'suggested_category_id' => $this->suggestedDocumentCategoryId,
+                'rule_id' => $this->categorySuggestionRuleId,
+                'matched_terms' => $this->categorySuggestionTerms,
+                'reason' => $this->categorySuggestionReason,
+            ]);
+        }
+
+        if ($this->categoryWasOverridden((int) $validated['documentCategoryId'])) {
+            $document->recordAudit($user, 'document_category_overridden', 'Document category manually overridden.', [
+                'suggested_category_id' => $this->suggestedDocumentCategoryId,
+                'selected_category_id' => (int) $validated['documentCategoryId'],
+                'rule_id' => $this->categorySuggestionRuleId,
+            ]);
+        }
+
         session()->flash('status', __('Draft document record created.'));
         session()->flash('created_document_number', $document->document_number);
 
-        return redirect()->route('documents.index');
+        return redirect()->route('documents.show', $document);
     }
 
     /**
@@ -156,6 +219,40 @@ new #[Title('Create Document Record')] class extends Component
         }
 
         $this->documentNumber = $documentType->nextDocumentNumber(CarbonImmutable::parse($this->documentDate)->year);
+    }
+
+    private function refreshSuggestedCategory(): void
+    {
+        $suggestion = (new SuggestDocumentCategory)->handle(
+            documentTypeId: is_numeric($this->documentTypeId) ? (int) $this->documentTypeId : null,
+            title: $this->title,
+            subject: $this->subject,
+            keywords: $this->keywords,
+        );
+
+        if ($suggestion === null) {
+            $this->suggestedDocumentCategoryId = null;
+            $this->categorySuggestionRuleId = null;
+            $this->categorySuggestionTerms = [];
+            $this->categorySuggestionReason = null;
+
+            return;
+        }
+
+        $this->suggestedDocumentCategoryId = $suggestion->category->id;
+        $this->categorySuggestionRuleId = $suggestion->rule->id;
+        $this->categorySuggestionTerms = $suggestion->matchedTerms;
+        $this->categorySuggestionReason = $suggestion->reason;
+
+        if (! $this->documentCategoryWasEdited || blank($this->documentCategoryId)) {
+            $this->documentCategoryId = (string) $suggestion->category->id;
+        }
+    }
+
+    private function categoryWasOverridden(int $selectedCategoryId): bool
+    {
+        return $this->suggestedDocumentCategoryId !== null
+            && $this->suggestedDocumentCategoryId !== $selectedCategoryId;
     }
 }; ?>
 
@@ -206,12 +303,23 @@ new #[Title('Create Document Record')] class extends Component
 
                 <flux:field>
                     <flux:label>{{ __('Primary category') }} <span class="text-red-600">*</span></flux:label>
-                    <flux:select wire:model="documentCategoryId">
+                    <flux:select wire:model.live="documentCategoryId">
                         <flux:select.option value="">{{ __('Select primary category') }}</flux:select.option>
                         @foreach ($this->documentCategories as $documentCategory)
                             <flux:select.option :value="$documentCategory->id" wire:key="document-category-{{ $documentCategory->id }}">{{ $documentCategory->name }}</flux:select.option>
                         @endforeach
                     </flux:select>
+                    @if ($suggestedDocumentCategoryId !== null)
+                        @php($suggestedCategory = $this->documentCategories->firstWhere('id', $suggestedDocumentCategoryId))
+                        @php($suggestionOverridden = $documentCategoryId !== '' && $suggestedDocumentCategoryId !== (int) $documentCategoryId)
+                        <div class="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-100">
+                            <p class="font-semibold">{{ __('Suggested: :category', ['category' => $suggestedCategory?->name ?? __('Unknown category')]) }}</p>
+                            <p class="mt-1 text-xs">{{ $categorySuggestionReason }}</p>
+                            @if ($suggestionOverridden)
+                                <flux:button class="mt-3" size="sm" variant="outline" type="button" wire:click="useSuggestedCategory">{{ __('Use suggestion') }}</flux:button>
+                            @endif
+                        </div>
+                    @endif
                     <flux:error name="documentCategoryId" />
                 </flux:field>
 

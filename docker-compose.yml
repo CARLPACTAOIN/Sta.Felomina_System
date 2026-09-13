@@ -1,0 +1,60 @@
+services:
+  app:
+    build:
+      context: .
+      target: app
+    environment:
+      APP_NAME: "Sta. Felomina Records"
+      APP_ENV: local
+      APP_KEY: "base64:irVy5eETprOCHYCOUMB9O8K0XrBn8SgLws+giQAg8kw="
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8080
+      LOG_CHANNEL: stack
+      LOG_STACK: single
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: barangay_system
+      DB_USERNAME: barangay
+      DB_PASSWORD: barangay
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      FILESYSTEM_DISK: local
+      MAIL_MAILER: log
+      VITE_APP_NAME: "Sta. Felomina Records"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - app_storage:/var/www/html/storage
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      target: nginx
+    ports:
+      - "8080:80"
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: barangay_system
+      POSTGRES_USER: barangay
+      POSTGRES_PASSWORD: barangay
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U barangay -d barangay_system"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  app_storage:
+  db_data:

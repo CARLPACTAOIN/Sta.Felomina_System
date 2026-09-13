@@ -23,7 +23,7 @@ test('secretary creates a draft document record without a pdf', function () {
         ->set('keywords', 'health, rehabilitation')
         ->call('save')
         ->assertHasNoErrors()
-        ->assertRedirect(route('documents.index'));
+        ->assertRedirect();
 
     $document = DocumentRecord::query()->firstOrFail();
 

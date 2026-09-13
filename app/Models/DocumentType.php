@@ -31,6 +31,22 @@ class DocumentType extends Model
         return $this->hasMany(DocumentRecord::class);
     }
 
+    /**
+     * @return HasMany<DocumentRecord, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(DocumentRecord::class);
+    }
+
+    /**
+     * @return HasMany<CategorizationRule, $this>
+     */
+    public function categorizationRules(): HasMany
+    {
+        return $this->hasMany(CategorizationRule::class);
+    }
+
     public function nextDocumentNumber(int $year): string
     {
         /** @var Collection<int, string> $existingNumbers */

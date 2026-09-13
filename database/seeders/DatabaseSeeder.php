@@ -14,7 +14,11 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(DocumentTaxonomySeeder::class);
-        $this->call(AccountSeeder::class);
+        $this->call([
+            DocumentTaxonomySeeder::class,
+            PurokSeeder::class,
+            AccountSeeder::class,
+            DemoDataSeeder::class,
+        ]);
     }
 }

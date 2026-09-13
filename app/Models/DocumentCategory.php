@@ -30,6 +30,22 @@ class DocumentCategory extends Model
     }
 
     /**
+     * @return HasMany<DocumentRecord, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(DocumentRecord::class);
+    }
+
+    /**
+     * @return HasMany<CategorizationRule, $this>
+     */
+    public function categorizationRules(): HasMany
+    {
+        return $this->hasMany(CategorizationRule::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

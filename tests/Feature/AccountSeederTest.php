@@ -1,12 +1,15 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\Purok;
 use App\Models\User;
 use Database\Seeders\AccountSeeder;
 use Illuminate\Support\Facades\Hash;
 
 test('account seeder populates official barangay staff accounts', function () {
     $this->seed(AccountSeeder::class);
+
+    expect(Purok::query()->count())->toBe(7);
 
     $captain = User::where('email', 'captain@stafelomina.local')->first();
     expect($captain)->not->toBeNull()
@@ -25,9 +28,15 @@ test('account seeder populates official barangay staff accounts', function () {
         ->and(Hash::check('password', $secretary->password))->toBeTrue();
 
     for ($i = 1; $i <= 7; $i++) {
+        $purok = Purok::where('code', "purok-{$i}")->first();
         $purokChair = User::where('email', "purok{$i}@stafelomina.local")->first();
+
+        expect($purok)->not->toBeNull()
+            ->and($purok->name)->toBe("Purok {$i}");
+
         expect($purokChair)->not->toBeNull()
             ->and($purokChair->role)->toBe(UserRole::PurokChairperson)
+            ->and($purokChair->purok_id)->toBe($purok?->id)
             ->and($purokChair->is_active)->toBeTrue()
             ->and($purokChair->email_verified_at)->not->toBeNull()
             ->and(Hash::check('password', $purokChair->password))->toBeTrue();
@@ -48,4 +57,6 @@ test('account seeder is idempotent and does not create duplicate accounts', func
 
     expect($countAfterSecondSeed)->toBe($countAfterFirstSeed)
         ->and($countAfterFirstSeed)->toBe(10);
+
+    expect(Purok::query()->count())->toBe(7);
 });

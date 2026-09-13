@@ -18,18 +18,66 @@
             </div>
         @endif
 
-        <x-foundation-notice :title="__('Archive list connected')">{{ __('Draft creation and token-based verification are live. Search, filters, PDF upload, approval, and lifecycle actions remain separate tested slices.') }}</x-foundation-notice>
+        <x-foundation-notice :title="__('Archive list connected')">{{ __('Draft creation, QR verification, approval workflow, category suggestions, and metadata filters are live. Report generation remains a separate tested slice.') }}</x-foundation-notice>
 
         <x-panel :padding="false">
-            <div class="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row lg:items-center dark:border-slate-700">
+            <form method="GET" action="{{ route('documents.index') }}" class="grid gap-3 border-b border-slate-200 p-4 lg:grid-cols-[minmax(0,1fr)_repeat(5,minmax(120px,170px))_auto] lg:items-end dark:border-slate-700">
                 <div class="min-w-0 flex-1">
-                    <flux:input icon="magnifying-glass" :placeholder="__('Search number, title, subject, or keyword...')" disabled />
+                    <flux:field>
+                        <flux:label>{{ __('Search') }}</flux:label>
+                        <flux:input name="q" icon="magnifying-glass" :value="$filters['q']" :placeholder="__('Number, title, subject, keyword...')" />
+                    </flux:field>
                 </div>
-                <div class="grid gap-2 sm:grid-cols-2 lg:flex lg:shrink-0">
-                    <flux:select :placeholder="__('All types')" class="lg:w-40" disabled><flux:select.option>{{ __('All types') }}</flux:select.option></flux:select>
-                    <flux:select :placeholder="__('All statuses')" class="lg:w-44" disabled><flux:select.option>{{ __('All statuses') }}</flux:select.option></flux:select>
+
+                <flux:field>
+                    <flux:label>{{ __('Type') }}</flux:label>
+                    <flux:select name="type">
+                        <flux:select.option value="" :selected="$filters['type'] === ''">{{ __('All types') }}</flux:select.option>
+                        @foreach ($documentTypes as $documentType)
+                            <flux:select.option :value="$documentType->id" :selected="(string) $filters['type'] === (string) $documentType->id" wire:key="document-filter-type-{{ $documentType->id }}">{{ $documentType->name }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </flux:field>
+
+                <flux:field>
+                    <flux:label>{{ __('Category') }}</flux:label>
+                    <flux:select name="category">
+                        <flux:select.option value="" :selected="$filters['category'] === ''">{{ __('All categories') }}</flux:select.option>
+                        @foreach ($documentCategories as $documentCategory)
+                            <flux:select.option :value="$documentCategory->id" :selected="(string) $filters['category'] === (string) $documentCategory->id" wire:key="document-filter-category-{{ $documentCategory->id }}">{{ $documentCategory->name }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </flux:field>
+
+                <flux:field>
+                    <flux:label>{{ __('Status') }}</flux:label>
+                    <flux:select name="status">
+                        <flux:select.option value="" :selected="$filters['status'] === ''">{{ __('All statuses') }}</flux:select.option>
+                        @foreach ($statuses as $status)
+                            <flux:select.option :value="$status->value" :selected="$filters['status'] === $status->value" wire:key="document-filter-status-{{ $status->value }}">{{ $status->label() }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </flux:field>
+
+                <flux:field>
+                    <flux:label>{{ __('Year') }}</flux:label>
+                    <flux:input name="year" type="number" min="1900" max="2100" :value="$filters['year']" />
+                </flux:field>
+
+                <flux:field>
+                    <flux:label>{{ __('Sort') }}</flux:label>
+                    <flux:select name="sort">
+                        @foreach ($sortOptions as $value => $label)
+                            <flux:select.option :value="$value" :selected="$filters['sort'] === $value" wire:key="document-sort-{{ $value }}">{{ __($label) }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </flux:field>
+
+                <div class="flex gap-2">
+                    <flux:button variant="primary" type="submit" icon="funnel">{{ __('Filter') }}</flux:button>
+                    <flux:button variant="outline" :href="route('documents.index')">{{ __('Reset') }}</flux:button>
                 </div>
-            </div>
+            </form>
 
             @if ($documents->isNotEmpty())
                 <div class="overflow-x-auto">
@@ -41,7 +89,7 @@
                                 <th>{{ __('Category') }}</th>
                                 <th>{{ __('Date') }}</th>
                                 <th>{{ __('Status') }}</th>
-                                <th>{{ __('Verification') }}</th>
+                                <th>{{ __('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -56,9 +104,14 @@
                                     <td>{{ $document->document_date->toFormattedDateString() }}</td>
                                     <td><x-status-badge :status="$document->status->value" /></td>
                                     <td>
-                                        <flux:button size="sm" variant="outline" icon="qr-code" :href="$document->verificationUrl()" target="_blank">
-                                            {{ __('Open') }}
-                                        </flux:button>
+                                        <div class="flex gap-2">
+                                            <flux:button size="sm" variant="outline" icon="eye" :href="route('documents.show', $document)" wire:navigate>
+                                                {{ __('Manage') }}
+                                            </flux:button>
+                                            <flux:button size="sm" variant="ghost" icon="qr-code" :href="$document->verificationUrl()" target="_blank">
+                                                {{ __('Verify') }}
+                                            </flux:button>
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach

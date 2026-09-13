@@ -1,7 +1,8 @@
 @props(['status'])
 
 @php
-    $normalizedStatus = str($status)->lower()->replace([' ', '_'], '-')->toString();
+    $rawStatus = $status instanceof \BackedEnum ? $status->value : (string) $status;
+    $normalizedStatus = str($rawStatus)->lower()->replace([' ', '_'], '-')->toString();
     $classes = match ($normalizedStatus) {
         'published', 'active', 'verified' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
         'pending', 'pending-approval' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
@@ -14,5 +15,5 @@
 
 <span {{ $attributes->class(['inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold', $classes]) }}>
     <span class="size-1.5 rounded-full bg-current" aria-hidden="true"></span>
-    {{ str($status)->headline() }}
+    {{ str($rawStatus)->headline() }}
 </span>

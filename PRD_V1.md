@@ -326,6 +326,18 @@ At minimum:
 - password validation must enforce a reasonable minimum length;
 - sensitive authentication actions must be audited.
 
+## 9.4 Authorization Implementation
+
+The system shall use **Spatie Laravel Permission** (`spatie/laravel-permission`)
+as the standard implementation for roles and permissions. The roles defined in
+§7 and the capabilities in §8 shall be represented by persisted Spatie roles
+and permissions rather than hard-coded UI checks.
+
+Authorization must still be enforced server-side through the application's
+policies, gates, and domain logic. Spatie permissions provide the role and
+capability assignments; they do not replace the required purok-level data
+isolation, status-transition rules, or other business constraints.
+
 ---
 
 # 10. Core Document Model

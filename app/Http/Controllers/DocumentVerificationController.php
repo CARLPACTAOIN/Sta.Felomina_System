@@ -10,7 +10,16 @@ class DocumentVerificationController extends Controller
     public function __invoke(string $token): View
     {
         $document = DocumentRecord::query()
-            ->with(['type', 'category'])
+            ->with([
+                'type',
+                'category',
+                'approver',
+                'archiver',
+                'revoker',
+                'superseder',
+                'supersededByDocumentRecord',
+                'fileVersions',
+            ])
             ->where('verification_token', $token)
             ->firstOrFail();
 

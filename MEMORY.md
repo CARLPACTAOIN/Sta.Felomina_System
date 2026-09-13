@@ -7,7 +7,7 @@ sessions. It is not a chat transcript, progress tracker, backlog, or handoff.
 If a fact is obvious from code or belongs in the PRD, link to that source instead
 of copying it here.
 
-**Last verified:** 2026-09-09
+**Last verified:** 2026-09-12
 
 ## Product Context
 
@@ -37,6 +37,9 @@ architectural impact:
 - Purok Chair access to resident data is enforced server-side by assigned purok.
 - Categorization is explainable, rule-based, metadata-driven, and overridable;
   OCR and AI classification are out of scope.
+- Categorization rules are priority-ordered persisted keyword rules with optional
+  document type conditions. Document records preserve the suggested category,
+  matched terms/reason, and audit-backed manual override metadata.
 - V1 notifications are in-app only. SMS and email notification infrastructure
   are out of scope.
 
@@ -80,6 +83,8 @@ pipeline also checks formatting and static analysis.
 | D-003 | Coordination files have non-overlapping roles: operating contract, scope audit, durable memory, and current handoff | AI-native workflow design | 2026-09-09 |
 | D-004 | Progress is reported by evidence-backed statuses, not invented percentages | Avoids false precision and repeated re-auditing | 2026-09-09 |
 | D-005 | Root `AGENTS.md` contains only cross-cutting rules; detailed framework guidance loads through skills and path-scoped `.ai/rules` | Reduces recurring context while preserving task-specific guidance | 2026-09-09 |
+| D-006 | Staff administration keeps the existing `UserRole` enum for now; Spatie role/permission persistence remains a later PRD-alignment task requiring explicit dependency approval | User-approved staff-account slice prioritized cost-efficient momentum and no new public API/dependency | 2026-09-10 |
+| D-007 | Resident and household codes are system-generated; household head is stored as a household-level name field, and normal deletion is represented by resident status changes for this slice | User-approved resident/household slice and PRD §20/§26.3 | 2026-09-10 |
 
 ## Memory Maintenance
 
