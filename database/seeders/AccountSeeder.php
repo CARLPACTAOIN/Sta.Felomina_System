@@ -15,6 +15,7 @@ class AccountSeeder extends Seeder
     public function run(): void
     {
         $this->call(PurokSeeder::class);
+        $this->call(RolePermissionSeeder::class);
 
         $accounts = [
             [
@@ -119,11 +120,12 @@ class AccountSeeder extends Seeder
                 [
                     'name' => $account['name'],
                     'password' => $account['password'],
-                    'role' => $account['role'],
                     'purok_id' => $purokId,
                     'is_active' => $account['is_active'],
                 ]
             );
+
+            $user->syncRoles($account['role']->value);
 
             $user->forceFill([
                 'email_verified_at' => $account['email_verified_at'],

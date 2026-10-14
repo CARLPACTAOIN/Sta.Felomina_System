@@ -15,6 +15,8 @@ class DocumentRecordController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', DocumentRecord::class);
+
         $filters = array_merge([
             'q' => '',
             'type' => '',
@@ -45,6 +47,8 @@ class DocumentRecordController extends Controller
                         ->orWhereRaw('LOWER(title) LIKE ?', ['%'.$search.'%'])
                         ->orWhereRaw('LOWER(subject) LIKE ?', ['%'.$search.'%'])
                         ->orWhereRaw('LOWER(keywords) LIKE ?', ['%'.$search.'%'])
+                        ->orWhereRaw('LOWER(project_name) LIKE ?', ['%'.$search.'%'])
+                        ->orWhereRaw('LOWER(project_location) LIKE ?', ['%'.$search.'%'])
                         ->orWhereHas('type', function (Builder $query) use ($search): void {
                             $query
                                 ->whereRaw('LOWER(name) LIKE ?', ['%'.$search.'%'])

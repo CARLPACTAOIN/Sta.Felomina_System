@@ -2,12 +2,16 @@
 
 namespace Database\Factories;
 
+use App\Enums\StaffPermission;
 use App\Enums\UserRole;
 use App\Models\Purok;
 use App\Models\User;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 /**
  * @extends Factory<User>
@@ -31,7 +35,6 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
-            'role' => UserRole::Secretary,
             'is_active' => true,
             'purok_id' => null,
             'remember_token' => Str::random(10),
@@ -39,6 +42,15 @@ class UserFactory extends Factory
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
         ];
+    }
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            if ($user->roles()->doesntExist()) {
+                $user->assignRole($this->roleName(UserRole::Secretary));
+            }
+        });
     }
 
     /**
@@ -65,17 +77,21 @@ class UserFactory extends Factory
 
     public function captain(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'role' => UserRole::Captain,
-        ]);
+        return $this->afterCreating(fn (User $user): User => $user->syncRoles($this->roleName(UserRole::Captain)));
+    }
+
+    public function secretary(): static
+    {
+        return $this->afterCreating(fn (User $user): User => $user->syncRoles($this->roleName(UserRole::Secretary)));
     }
 
     public function purokChairperson(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'role' => UserRole::PurokChairperson,
-            'purok_id' => Purok::factory(),
-        ]);
+        return $this
+            ->state(fn (array $attributes) => [
+                'purok_id' => Purok::factory(),
+            ])
+            ->afterCreating(fn (User $user): User => $user->syncRoles($this->roleName(UserRole::PurokChairperson)));
     }
 
     public function inactive(): static
@@ -83,5 +99,16 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'is_active' => false,
         ]);
+    }
+
+    private function roleName(UserRole $role): string
+    {
+        if (Permission::query()->count() < count(StaffPermission::cases())) {
+            app(RolePermissionSeeder::class)->run();
+        }
+
+        Role::findOrCreate($role->value);
+
+        return $role->value;
     }
 }

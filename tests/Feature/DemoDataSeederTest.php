@@ -112,8 +112,8 @@ test('tier 1: demo data seeder creates historical audit logs and staff notificat
     $auditActions = AuditLog::query()->distinct()->pluck('action')->all();
     expect($auditActions)->toContain('document_approved');
 
-    $captain = User::query()->where('role', UserRole::Captain->value)->first();
-    $secretary = User::query()->where('role', UserRole::Secretary->value)->first();
+    $captain = User::role(UserRole::Captain->value)->first();
+    $secretary = User::role(UserRole::Secretary->value)->first();
 
     expect($captain)->not->toBeNull()
         ->and($secretary)->not->toBeNull();
@@ -122,9 +122,18 @@ test('tier 1: demo data seeder creates historical audit logs and staff notificat
     $secretaryNotifications = DB::table('notifications')->where('notifiable_id', $secretary->id)->count();
 
     expect($captainNotifications + $secretaryNotifications)->toBeGreaterThan(0);
+
+    expect($auditActions)
+        ->toContain('document_created')
+        ->toContain('document_submitted')
+        ->toContain('document_approved')
+        ->toContain('document_category_suggested')
+        ->toContain('document_category_overridden')
+        ->toContain('household_created')
+        ->toContain('resident_created');
 });
 
-test('tier 1: demo data seeder creates physical pdf storage assets for documents', function () {
+test('tier 1: demo data seeder creates standard-compliant physical pdf storage assets for documents', function () {
     $this->seed(DemoDataSeeder::class);
 
     $publishedDocuments = DocumentRecord::query()->where('status', DocumentStatus::Published)->get();
@@ -134,7 +143,51 @@ test('tier 1: demo data seeder creates physical pdf storage assets for documents
         $fileVersion = $doc->currentFileVersion();
         expect($fileVersion)->not->toBeNull();
         expect(Storage::disk('local')->exists($fileVersion->file_path))->toBeTrue();
+
+        $pdfBytes = Storage::disk('local')->get($fileVersion->file_path);
+        expect($pdfBytes)
+            ->toStartWith('%PDF-1.4')
+            ->toContain('xref')
+            ->toContain('trailer')
+            ->toContain('startxref')
+            ->toEndWith("%%EOF\n");
     }
+});
+
+test('tier 1: demo data seeder populates infrastructure project metadata', function () {
+    $this->seed(DemoDataSeeder::class);
+
+    $projectDocs = DocumentRecord::query()->where('is_project_related', true)->get();
+    expect($projectDocs->count())->toBeGreaterThanOrEqual(6);
+
+    foreach ($projectDocs as $doc) {
+        expect($doc->project_name)->not->toBeNull()
+            ->and($doc->project_location)->not->toBeNull()
+            ->and($doc->approved_budget)->not->toBeNull()
+            ->and((float) $doc->approved_budget)->toBeGreaterThan(0);
+    }
+
+    $res2024 = DocumentRecord::query()->where('document_number', 'RES-2024-001')->firstOrFail();
+    expect($res2024->is_project_related)->toBeTrue()
+        ->and($res2024->project_name)->toContain('Farm-to-Market Road')
+        ->and((float) $res2024->approved_budget)->toBe(2500000.00);
+});
+
+test('tier 1: demo data seeder populates rule-based categorization suggestions and overrides', function () {
+    $this->seed(DemoDataSeeder::class);
+
+    $suggestedDocs = DocumentRecord::query()->whereNotNull('suggested_document_category_id')->get();
+    expect($suggestedDocs->count())->toBeGreaterThanOrEqual(10);
+
+    $overriddenDoc = DocumentRecord::query()->whereNotNull('category_overridden_at')->first();
+    expect($overriddenDoc)->not->toBeNull()
+        ->and($overriddenDoc->category_overridden_by_id)->not->toBeNull()
+        ->and($overriddenDoc->suggested_document_category_id)->not->toBeNull()
+        ->and($overriddenDoc->document_category_id)->not->toBe($overriddenDoc->suggested_document_category_id);
+
+    $overrideAudit = AuditLog::query()->where('action', 'document_category_overridden')->first();
+    expect($overrideAudit)->not->toBeNull()
+        ->and($overrideAudit->auditable_id)->toBe($overriddenDoc->id);
 });
 
 /*
@@ -169,8 +222,8 @@ test('tier 2: demo data seeder bootstraps foundational seeders if database is fr
     $this->seed(DemoDataSeeder::class);
 
     expect(Purok::query()->count())->toBe(7)
-        ->and(User::query()->where('role', UserRole::Captain->value)->count())->toBe(1)
-        ->and(User::query()->where('role', UserRole::Secretary->value)->count())->toBeGreaterThanOrEqual(1)
+        ->and(User::role(UserRole::Captain->value)->count())->toBe(1)
+        ->and(User::role(UserRole::Secretary->value)->count())->toBeGreaterThanOrEqual(1)
         ->and(DocumentType::query()->count())->toBeGreaterThanOrEqual(4)
         ->and(DocumentCategory::query()->count())->toBeGreaterThanOrEqual(5);
 });
@@ -390,8 +443,8 @@ test('tier 4: physical storage pdf files stream cleanly for published documents 
 test('tier 4: captain and secretary dashboards display accurate seeded metrics and pending items', function () {
     $this->seed(DemoDataSeeder::class);
 
-    $captain = User::query()->where('role', UserRole::Captain->value)->firstOrFail();
-    $secretary = User::query()->where('role', UserRole::Secretary->value)->firstOrFail();
+    $captain = User::role(UserRole::Captain->value)->firstOrFail();
+    $secretary = User::role(UserRole::Secretary->value)->firstOrFail();
 
     $pendingCount = DocumentRecord::query()->where('status', DocumentStatus::PendingApproval)->count();
     $residentCount = Resident::query()->count();

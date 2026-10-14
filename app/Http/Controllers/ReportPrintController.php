@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\UserRole;
+use App\Enums\StaffPermission;
 use App\Services\ReportEngine;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -17,12 +17,12 @@ class ReportPrintController extends Controller
 
         $type = $request->string('type', 'document')->value();
 
-        if ($user->role === UserRole::PurokChairperson) {
+        if ($user->isPurokChairperson()) {
             $type = 'resident';
         }
 
         if ($type === 'document') {
-            abort_unless($user->role->canManageDocuments(), 403, 'Unauthorized to view document reports.');
+            abort_unless($user->can(StaffPermission::ViewDocumentReports->value), 403, 'Unauthorized to view document reports.');
 
             $filters = $request->only([
                 'year',

@@ -32,15 +32,15 @@ class DemoDataSeeder extends Seeder
         $this->ensurePrerequisites();
         $this->ensureTaxonomyExpanded();
 
-        $captain = User::query()->where('role', UserRole::Captain->value)->firstOrFail();
-        $secretary = User::query()->where('role', UserRole::Secretary->value)->where('is_active', true)->firstOrFail();
+        $captain = User::role(UserRole::Captain->value)->firstOrFail();
+        $secretary = User::role(UserRole::Secretary->value)->where('is_active', true)->firstOrFail();
 
         $puroks = Purok::query()->where('is_active', true)->get()->keyBy('code');
         $chairpersons = User::query()
-            ->where('role', UserRole::PurokChairperson->value)
+            ->role(UserRole::PurokChairperson->value)
             ->with('purok')
             ->get()
-            ->keyBy(fn (User $user): string => $user->purok?->code ?? '');
+            ->keyBy(fn (User $user): string => $user->purok->code ?? '');
 
         DB::transaction(function () use ($captain, $secretary, $puroks, $chairpersons): void {
             $this->seedHouseholdsAndResidents($puroks, $chairpersons);
@@ -59,6 +59,7 @@ class DemoDataSeeder extends Seeder
         $this->callOnce([
             DocumentTaxonomySeeder::class,
             PurokSeeder::class,
+            RolePermissionSeeder::class,
             AccountSeeder::class,
         ]);
 
@@ -215,7 +216,7 @@ class DemoDataSeeder extends Seeder
                 ->where('document_number', $data['number'])
                 ->first();
 
-            $token = $existing?->verification_token
+            $token = $existing->verification_token
                 ?? substr(hash('sha256', "STA-FELOMINA-DOC-{$data['number']}-{$data['year']}-VERIFY"), 0, 48);
 
             $isWorkingDoc = in_array($data['status'], [
@@ -226,6 +227,32 @@ class DemoDataSeeder extends Seeder
 
             $draftPdfPath = $isWorkingDoc ? "document-drafts/{$data['number']}-draft.pdf" : null;
 
+            $isOverridden = ! empty($data['category_overridden']);
+            $suggestedCategoryId = null;
+            $suggestionRuleId = null;
+            $suggestionTerms = null;
+            $suggestionReason = null;
+            $suggestedAt = null;
+            $overriddenAt = null;
+            $overriddenById = null;
+
+            if (isset($data['suggested_category_slug'])) {
+                $suggestedCat = DocumentCategory::query()->where('slug', $data['suggested_category_slug'])->first();
+                if ($suggestedCat) {
+                    $suggestedCategoryId = $suggestedCat->id;
+                    $rule = CategorizationRule::query()->where('document_category_id', $suggestedCat->id)->first();
+                    $suggestionRuleId = $rule?->id;
+                    $suggestionTerms = $data['suggestion_terms'] ?? ($rule ? array_values(array_intersect($data['keywords'], $rule->keywords ?? [])) : null);
+                    $suggestionReason = $data['suggestion_reason'] ?? ($rule ? "Matched keyword rule: {$rule->name}" : null);
+                    $suggestedAt = Carbon::parse($data['date'])->addMinutes(15);
+
+                    if ($isOverridden) {
+                        $overriddenAt = Carbon::parse($data['date'])->addMinutes(30);
+                        $overriddenById = $secretary->id;
+                    }
+                }
+            }
+
             $record = DocumentRecord::query()->updateOrCreate(
                 [
                     'document_type_id' => $type->id,
@@ -234,11 +261,18 @@ class DemoDataSeeder extends Seeder
                 ],
                 [
                     'document_category_id' => $category->id,
+                    'suggested_document_category_id' => $suggestedCategoryId,
+                    'category_suggestion_rule_id' => $suggestionRuleId,
+                    'category_suggestion_terms' => $suggestionTerms,
+                    'category_suggestion_reason' => $suggestionReason,
+                    'category_suggested_at' => $suggestedAt,
+                    'category_overridden_at' => $overriddenAt,
+                    'category_overridden_by_id' => $overriddenById,
                     'created_by_id' => $secretary->id,
                     'title' => $data['title'],
                     'document_date' => $data['date'],
                     'subject' => $data['subject'],
-                    'keywords' => is_array($data['keywords']) ? implode(', ', $data['keywords']) : $data['keywords'],
+                    'keywords' => implode(', ', $data['keywords']),
                     'status' => $data['status'],
                     'verification_token' => $token,
                     'draft_pdf_path' => $draftPdfPath,
@@ -260,6 +294,13 @@ class DemoDataSeeder extends Seeder
                     'revoked_at' => isset($data['revoked_at']) ? Carbon::parse($data['revoked_at']) : null,
                     'revoked_by_id' => isset($data['revoked_at']) ? $captain->id : null,
                     'revoke_reason' => $data['revoke_reason'] ?? null,
+                    'is_project_related' => $data['is_project_related'] ?? false,
+                    'project_name' => $data['project_name'] ?? null,
+                    'project_location' => $data['project_location'] ?? null,
+                    'approved_budget' => $data['approved_budget'] ?? null,
+                    'project_start_date' => isset($data['project_start_date']) ? Carbon::parse($data['project_start_date']) : null,
+                    'target_completion_date' => isset($data['target_completion_date']) ? Carbon::parse($data['target_completion_date']) : null,
+                    'project_remarks' => $data['project_remarks'] ?? null,
                 ]
             );
 
@@ -283,7 +324,7 @@ class DemoDataSeeder extends Seeder
                 ->where('document_number', $data['number'])
                 ->first();
 
-            $token = $existing?->verification_token
+            $token = $existing->verification_token
                 ?? substr(hash('sha256', "STA-FELOMINA-DOC-{$data['number']}-{$data['year']}-VERIFY"), 0, 48);
 
             $record = DocumentRecord::query()->updateOrCreate(
@@ -298,7 +339,7 @@ class DemoDataSeeder extends Seeder
                     'title' => $data['title'],
                     'document_date' => $data['date'],
                     'subject' => $data['subject'],
-                    'keywords' => is_array($data['keywords']) ? implode(', ', $data['keywords']) : $data['keywords'],
+                    'keywords' => implode(', ', $data['keywords']),
                     'status' => DocumentStatus::Superseded,
                     'verification_token' => $token,
                     'submitted_at' => Carbon::parse($data['submitted_at']),
@@ -310,6 +351,13 @@ class DemoDataSeeder extends Seeder
                     'supersede_reason' => $data['supersede_reason'],
                     'superseded_by_document_record_id' => $replacement->id,
                     'supersede_reference' => $data['supersede_reference'],
+                    'is_project_related' => $data['is_project_related'] ?? false,
+                    'project_name' => $data['project_name'] ?? null,
+                    'project_location' => $data['project_location'] ?? null,
+                    'approved_budget' => $data['approved_budget'] ?? null,
+                    'project_start_date' => isset($data['project_start_date']) ? Carbon::parse($data['project_start_date']) : null,
+                    'target_completion_date' => isset($data['target_completion_date']) ? Carbon::parse($data['target_completion_date']) : null,
+                    'project_remarks' => $data['project_remarks'] ?? null,
                 ]
             );
 
@@ -363,6 +411,88 @@ class DemoDataSeeder extends Seeder
         $documents = DocumentRecord::query()->get();
 
         foreach ($documents as $doc) {
+            AuditLog::query()->firstOrCreate(
+                [
+                    'auditable_type' => DocumentRecord::class,
+                    'auditable_id' => $doc->id,
+                    'action' => 'document_created',
+                ],
+                [
+                    'actor_id' => $doc->created_by_id ?? $secretary->id,
+                    'summary' => "Draft document record {$doc->document_number} created.",
+                    'context' => [
+                        'document_number' => $doc->document_number,
+                        'document_type_id' => $doc->document_type_id,
+                        'document_category_id' => $doc->document_category_id,
+                    ],
+                    'created_at' => Carbon::parse($doc->document_date)->setTime(8, 30),
+                    'updated_at' => Carbon::parse($doc->document_date)->setTime(8, 30),
+                ]
+            );
+
+            if ($doc->category_suggested_at) {
+                AuditLog::query()->firstOrCreate(
+                    [
+                        'auditable_type' => DocumentRecord::class,
+                        'auditable_id' => $doc->id,
+                        'action' => 'document_category_suggested',
+                    ],
+                    [
+                        'actor_id' => $doc->created_by_id ?? $secretary->id,
+                        'summary' => 'Document category suggested.',
+                        'context' => [
+                            'suggested_category_id' => $doc->suggested_document_category_id,
+                            'rule_id' => $doc->category_suggestion_rule_id,
+                            'matched_terms' => $doc->category_suggestion_terms,
+                            'reason' => $doc->category_suggestion_reason,
+                        ],
+                        'created_at' => $doc->category_suggested_at,
+                        'updated_at' => $doc->category_suggested_at,
+                    ]
+                );
+            }
+
+            if ($doc->category_overridden_at) {
+                AuditLog::query()->firstOrCreate(
+                    [
+                        'auditable_type' => DocumentRecord::class,
+                        'auditable_id' => $doc->id,
+                        'action' => 'document_category_overridden',
+                    ],
+                    [
+                        'actor_id' => $doc->category_overridden_by_id ?? $secretary->id,
+                        'summary' => 'Document category manually overridden.',
+                        'context' => [
+                            'suggested_category_id' => $doc->suggested_document_category_id,
+                            'selected_category_id' => $doc->document_category_id,
+                            'rule_id' => $doc->category_suggestion_rule_id,
+                        ],
+                        'created_at' => $doc->category_overridden_at,
+                        'updated_at' => $doc->category_overridden_at,
+                    ]
+                );
+            }
+
+            if ($doc->draft_pdf_uploaded_at) {
+                AuditLog::query()->firstOrCreate(
+                    [
+                        'auditable_type' => DocumentRecord::class,
+                        'auditable_id' => $doc->id,
+                        'action' => 'document_draft_uploaded',
+                    ],
+                    [
+                        'actor_id' => $doc->draft_pdf_uploaded_by_id ?? $secretary->id,
+                        'summary' => 'Draft PDF uploaded.',
+                        'context' => [
+                            'original_name' => $doc->draft_pdf_original_name,
+                            'size' => $doc->draft_pdf_size,
+                        ],
+                        'created_at' => $doc->draft_pdf_uploaded_at,
+                        'updated_at' => $doc->draft_pdf_uploaded_at,
+                    ]
+                );
+            }
+
             if ($doc->submitted_at) {
                 AuditLog::query()->firstOrCreate(
                     [
@@ -571,7 +701,8 @@ class DemoDataSeeder extends Seeder
         DocumentRecord $doc,
         string $message,
         bool $isRead,
-        Carbon|string $createdAt
+        Carbon|string $createdAt,
+        ?string $url = null
     ): void {
         $createdAtCarbon = $createdAt instanceof Carbon ? $createdAt : Carbon::parse($createdAt);
         $hash = md5("notification:{$user->id}:{$doc->id}:{$message}");
@@ -586,6 +717,10 @@ class DemoDataSeeder extends Seeder
 
         $readAt = $isRead ? $createdAtCarbon->copy()->addHours(2) : null;
 
+        $targetUrl = $url ?? ($user->hasRole('captain') && $doc->status === DocumentStatus::PendingApproval
+            ? '/approvals?search='.urlencode($doc->document_number)."#pending-approval-{$doc->id}"
+            : "/documents/{$doc->id}");
+
         DB::table('notifications')->updateOrInsert(
             ['id' => $uuid],
             [
@@ -597,7 +732,7 @@ class DemoDataSeeder extends Seeder
                     'document_number' => $doc->document_number,
                     'title' => $doc->title,
                     'message' => $message,
-                    'url' => "/documents/{$doc->id}",
+                    'url' => $targetUrl,
                 ], JSON_THROW_ON_ERROR),
                 'read_at' => $readAt,
                 'created_at' => $createdAtCarbon,
@@ -607,39 +742,59 @@ class DemoDataSeeder extends Seeder
     }
 
     /**
-     * Generate standard-compliant minimal 1-page PDF string.
+     * Generate standard-compliant minimal 1-page PDF string with dynamic xref byte offsets.
      */
     protected function generateMinimalPdf(string $title, string $docNumber): string
     {
-        $content = sprintf(
-            "BT\n/F1 14 Tf\n72 720 Td\n(Republic of the Philippines) Tj\n".
-            "0 -20 Td\n(Province of Ilocos Norte - City of Laoag) Tj\n".
-            "0 -20 Td\n(BARANGAY STA. FELOMINA) Tj\n".
-            "0 -35 Td\n/F1 12 Tf\n(Official Record: %s) Tj\n".
-            "0 -20 Td\n(Title: %s) Tj\n".
-            "0 -30 Td\n(This is an official digitized barangay document record.) Tj\nET",
-            addcslashes($docNumber, '()\\'),
-            addcslashes(substr($title, 0, 60), '()\\')
+        $safeDocNumber = addcslashes($docNumber, '()\\');
+        $safeTitle = addcslashes(substr($title, 0, 75), '()\\');
+
+        $content = "BT\n"
+            ."/F1 14 Tf\n"
+            ."72 720 Td\n"
+            ."(Republic of the Philippines) Tj\n"
+            ."0 -18 Td\n"
+            ."(Province of Ilocos Norte - City of Laoag) Tj\n"
+            ."0 -18 Td\n"
+            ."(BARANGAY STA. FELOMINA) Tj\n"
+            ."0 -32 Td\n"
+            ."/F1 12 Tf\n"
+            .'(Official Document Record: '.$safeDocNumber.") Tj\n"
+            ."0 -20 Td\n"
+            .'(Title: '.$safeTitle.") Tj\n"
+            ."0 -28 Td\n"
+            ."/F1 10 Tf\n"
+            ."(Official digitized repository record of Barangay Sta. Felomina.) Tj\n"
+            ."0 -16 Td\n"
+            ."(Certified accurate by the Punong Barangay and Sangguniang Barangay.) Tj\n"
+            ."ET\n";
+
+        $header = "%PDF-1.4\n";
+        $obj1 = "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";
+        $obj2 = "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n";
+        $obj3 = "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n";
+        $obj4 = "4 0 obj\n<< /Length ".strlen($content)." >>\nstream\n".$content."endstream\nendobj\n";
+        $obj5 = "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n";
+
+        $offset1 = strlen($header);
+        $offset2 = $offset1 + strlen($obj1);
+        $offset3 = $offset2 + strlen($obj2);
+        $offset4 = $offset3 + strlen($obj3);
+        $offset5 = $offset4 + strlen($obj4);
+        $xrefOffset = $offset5 + strlen($obj5);
+
+        $xref = sprintf(
+            "xref\n0 6\n0000000000 65535 f \n%010d 00000 n \n%010d 00000 n \n%010d 00000 n \n%010d 00000 n \n%010d 00000 n \n",
+            $offset1,
+            $offset2,
+            $offset3,
+            $offset4,
+            $offset5
         );
 
-        $contentLength = strlen($content);
+        $trailer = "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n".$xrefOffset."\n%%EOF\n";
 
-        return "%PDF-1.4\n".
-            "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n".
-            "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n".
-            "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n".
-            "4 0 obj\n<< /Length ".$contentLength." >>\nstream\n".
-            $content."\nendstream\nendobj\n".
-            "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n".
-            "xref\n0 6\n".
-            "0000000000 65535 f \n".
-            "0000000009 00000 n \n".
-            "0000000058 00000 n \n".
-            "0000000115 00000 n \n".
-            "0000000252 00000 n \n".
-            "0000000320 00000 n \n".
-            "trailer\n<< /Size 6 /Root 1 0 R >>\n".
-            "startxref\n390\n%%EOF";
+        return $header.$obj1.$obj2.$obj3.$obj4.$obj5.$xref.$trailer;
     }
 
     /**
@@ -2548,7 +2703,7 @@ class DemoDataSeeder extends Seeder
     /**
      * Phase 1: 29 Non-Superseded Documents.
      *
-     * @return array<int, array{number: string, type_code: string, category_slug: string, year: int, date: string, title: string, subject: string, keywords: array<string>, status: DocumentStatus, submitted_at?: string, approved_at?: string, returned_at?: string, return_comment?: string, archived_at?: string, archive_reason?: string, revoked_at?: string, revoke_reason?: string}>
+     * @return array<int, array{number: string, type_code: string, category_slug: string, year: int, date: string, title: string, subject: string, keywords: array<string>, status: DocumentStatus, submitted_at?: string, approved_at?: string, returned_at?: string, return_comment?: string, archived_at?: string, archive_reason?: string, revoked_at?: string, revoke_reason?: string, is_project_related?: bool, project_name?: string, project_location?: string, approved_budget?: float, project_start_date?: string, target_completion_date?: string, project_remarks?: string, suggested_category_slug?: string, suggestion_terms?: array<string>, suggestion_reason?: string, category_overridden?: bool}>
      */
     protected function phase1DocumentsData(): array
     {
@@ -2558,6 +2713,9 @@ class DemoDataSeeder extends Seeder
                 'number' => 'RES-2024-001',
                 'type_code' => 'resolution',
                 'category_slug' => 'infrastructure',
+                'suggested_category_slug' => 'infrastructure',
+                'suggestion_terms' => ['road', 'infrastructure', 'concreting'],
+                'suggestion_reason' => 'Matched keyword rule: Infrastructure Keywords',
                 'year' => 2024,
                 'date' => '2024-03-15',
                 'title' => 'Concreting of Purok 1 to Purok 3 Farm-to-Market Road',
@@ -2568,11 +2726,21 @@ class DemoDataSeeder extends Seeder
                 'approved_at' => '2024-03-18 14:00:00',
                 'archived_at' => '2025-01-10 10:00:00',
                 'archive_reason' => 'Project construction completed and audited; administrative retention period archived.',
+                'is_project_related' => true,
+                'project_name' => 'Purok 1 to Purok 3 Farm-to-Market Road Concreting',
+                'project_location' => 'Purok 1 to Purok 3, Barangay Sta. Felomina',
+                'approved_budget' => 2500000.00,
+                'project_start_date' => '2024-04-01',
+                'target_completion_date' => '2024-11-30',
+                'project_remarks' => 'Completed in full compliance with municipal engineering specifications.',
             ],
             [
                 'number' => 'EO-2024-001',
                 'type_code' => 'executive_order',
                 'category_slug' => 'disaster-risk-reduction',
+                'suggested_category_slug' => 'disaster-risk-reduction',
+                'suggestion_terms' => ['disaster', 'bdrrmc', 'rescue', 'preparedness'],
+                'suggestion_reason' => 'Matched keyword rule: Disaster Risk Reduction Keywords',
                 'year' => 2024,
                 'date' => '2024-06-05',
                 'title' => 'Reorganization and Mobilization of the Barangay Disaster Risk Reduction and Management Committee (BDRRMC)',
@@ -2599,6 +2767,9 @@ class DemoDataSeeder extends Seeder
                 'number' => 'ORD-2024-002',
                 'type_code' => 'ordinance',
                 'category_slug' => 'infrastructure',
+                'suggested_category_slug' => 'infrastructure',
+                'suggestion_terms' => ['waste', 'segregation', 'infrastructure'],
+                'suggestion_reason' => 'Matched keyword rule: Infrastructure Keywords',
                 'year' => 2024,
                 'date' => '2024-09-18',
                 'title' => 'Comprehensive Solid Waste Management and Mandatory Purok Waste Segregation',
@@ -2607,6 +2778,13 @@ class DemoDataSeeder extends Seeder
                 'status' => DocumentStatus::Published,
                 'submitted_at' => '2024-09-20 09:30:00',
                 'approved_at' => '2024-09-22 14:15:00',
+                'is_project_related' => true,
+                'project_name' => 'Barangay Materials Recovery Facility & Composting Center',
+                'project_location' => 'Purok 5 Ecological Park, Barangay Sta. Felomina',
+                'approved_budget' => 850000.00,
+                'project_start_date' => '2024-10-01',
+                'target_completion_date' => '2025-02-28',
+                'project_remarks' => 'Materials Recovery Facility constructed and operational.',
             ],
             [
                 'number' => 'RES-2024-003',
@@ -2629,6 +2807,9 @@ class DemoDataSeeder extends Seeder
                 'number' => 'RES-2025-001',
                 'type_code' => 'resolution',
                 'category_slug' => 'disaster-risk-reduction',
+                'suggested_category_slug' => 'disaster-risk-reduction',
+                'suggestion_terms' => ['calamity', 'flood', 'bdrrmc', 'disaster'],
+                'suggestion_reason' => 'Matched keyword rule: Disaster Risk Reduction Keywords',
                 'year' => 2025,
                 'date' => '2025-01-28',
                 'title' => 'Allocation of 5% Local Calamity Fund for Flood Mitigation in Puroks 4 and 5',
@@ -2711,6 +2892,9 @@ class DemoDataSeeder extends Seeder
                 'number' => 'RES-2025-003',
                 'type_code' => 'resolution',
                 'category_slug' => 'infrastructure',
+                'suggested_category_slug' => 'infrastructure',
+                'suggestion_terms' => ['infrastructure', 'streetlights', 'solar'],
+                'suggestion_reason' => 'Matched keyword rule: Infrastructure Keywords',
                 'year' => 2025,
                 'date' => '2025-10-19',
                 'title' => 'Installation of Solar-Powered Streetlights along Sitio Riverside and Purok 6',
@@ -2719,16 +2903,27 @@ class DemoDataSeeder extends Seeder
                 'status' => DocumentStatus::Published,
                 'submitted_at' => '2025-10-21 08:45:00',
                 'approved_at' => '2025-10-23 15:30:00',
+                'is_project_related' => true,
+                'project_name' => 'Sitio Riverside & Purok 6 Solar Streetlight Installation',
+                'project_location' => 'Sitio Riverside and Purok 6, Barangay Sta. Felomina',
+                'approved_budget' => 750000.00,
+                'project_start_date' => '2025-11-01',
+                'target_completion_date' => '2025-12-15',
+                'project_remarks' => '50 LED solar streetlights installed with 2-year warranty.',
             ],
             [
                 'number' => 'CERT-2025-002',
                 'type_code' => 'certificate',
                 'category_slug' => 'peace-and-order',
+                'suggested_category_slug' => 'governance',
+                'category_overridden' => true,
+                'suggestion_terms' => ['compliance'],
+                'suggestion_reason' => 'Matched keyword rule: Governance Keywords',
                 'year' => 2025,
                 'date' => '2025-11-28',
                 'title' => 'Lupon Tagapamayapa Dispute Settlement Compliance Certification',
                 'subject' => 'Certification of amicable dispute resolution under Katarungang Pambarangay',
-                'keywords' => ['lupon', 'dispute', 'peace and order', 'katarungan'],
+                'keywords' => ['lupon', 'dispute', 'peace and order', 'katarungan', 'compliance'],
                 'status' => DocumentStatus::Published,
                 'submitted_at' => '2025-11-29 10:00:00',
                 'approved_at' => '2025-11-30 11:15:00',
@@ -2739,6 +2934,9 @@ class DemoDataSeeder extends Seeder
                 'number' => 'ORD-2026-001',
                 'type_code' => 'ordinance',
                 'category_slug' => 'peace-and-order',
+                'suggested_category_slug' => 'peace-and-order',
+                'suggestion_terms' => ['curfew', 'peace and order', 'minors'],
+                'suggestion_reason' => 'Matched keyword rule: Peace & Order Keywords',
                 'year' => 2026,
                 'date' => '2026-01-10',
                 'title' => 'Omnibus Youth Protection, Curfew Hours, and Child Welfare Ordinance of 2026',
@@ -2765,6 +2963,9 @@ class DemoDataSeeder extends Seeder
                 'number' => 'RES-2026-001',
                 'type_code' => 'resolution',
                 'category_slug' => 'disaster-risk-reduction',
+                'suggested_category_slug' => 'disaster-risk-reduction',
+                'suggestion_terms' => ['disaster', 'bdrrmc', 'evacuation', 'preparedness'],
+                'suggestion_reason' => 'Matched keyword rule: Disaster Risk Reduction Keywords',
                 'year' => 2026,
                 'date' => '2026-01-16',
                 'title' => 'Barangay Disaster Risk Reduction Master Plan and Evacuation Protocol for 2026-2028',
@@ -2804,6 +3005,9 @@ class DemoDataSeeder extends Seeder
                 'number' => 'ORD-2026-002',
                 'type_code' => 'ordinance',
                 'category_slug' => 'infrastructure',
+                'suggested_category_slug' => 'infrastructure',
+                'suggestion_terms' => ['drainage', 'infrastructure'],
+                'suggestion_reason' => 'Matched keyword rule: Infrastructure Keywords',
                 'year' => 2026,
                 'date' => '2026-03-01',
                 'title' => 'Purok Drainage Maintenance and Anti-Littering Ordinance',
@@ -2812,11 +3016,21 @@ class DemoDataSeeder extends Seeder
                 'status' => DocumentStatus::Published,
                 'submitted_at' => '2026-03-03 10:00:00',
                 'approved_at' => '2026-03-05 15:15:00',
+                'is_project_related' => true,
+                'project_name' => 'Purok Perimeter Drainage Canal Rehabilitation',
+                'project_location' => 'Purok 2 and Purok 3, Barangay Sta. Felomina',
+                'approved_budget' => 600000.00,
+                'project_start_date' => '2026-03-15',
+                'target_completion_date' => '2026-05-30',
+                'project_remarks' => 'Reinforced canal lining and silt trap construction completed.',
             ],
             [
                 'number' => 'RES-2026-003',
                 'type_code' => 'resolution',
                 'category_slug' => 'infrastructure',
+                'suggested_category_slug' => 'infrastructure',
+                'suggestion_terms' => ['construction', 'facility', 'infrastructure'],
+                'suggestion_reason' => 'Matched keyword rule: Infrastructure Keywords',
                 'year' => 2026,
                 'date' => '2026-03-08',
                 'title' => 'Authorization for Construction of Purok 6 Multipurpose Evacuation Center',
@@ -2827,6 +3041,13 @@ class DemoDataSeeder extends Seeder
                 'approved_at' => '2026-03-12 14:00:00',
                 'archived_at' => '2026-07-15 10:30:00',
                 'archive_reason' => 'Replaced by direct provincial grant agreement; barangay funding file closed and archived.',
+                'is_project_related' => true,
+                'project_name' => 'Purok 6 Multipurpose Evacuation Center Construction',
+                'project_location' => 'Purok 6 High Ground Area, Barangay Sta. Felomina',
+                'approved_budget' => 4800000.00,
+                'project_start_date' => '2026-04-01',
+                'target_completion_date' => '2026-10-31',
+                'project_remarks' => 'Barangay allocation archived following direct provincial funding agreement.',
             ],
             [
                 'number' => 'ORD-2026-003',
@@ -2847,6 +3068,9 @@ class DemoDataSeeder extends Seeder
                 'number' => 'RES-2026-004',
                 'type_code' => 'resolution',
                 'category_slug' => 'education',
+                'suggested_category_slug' => 'education',
+                'suggestion_terms' => ['education', 'learning', 'youth'],
+                'suggestion_reason' => 'Matched keyword rule: Education Keywords',
                 'year' => 2026,
                 'date' => '2026-08-10',
                 'title' => 'Establishment of Community Learning Center and Free Wi-Fi Hub in Purok 2',
@@ -2859,6 +3083,9 @@ class DemoDataSeeder extends Seeder
                 'number' => 'ORD-2026-004',
                 'type_code' => 'ordinance',
                 'category_slug' => 'disaster-risk-reduction',
+                'suggested_category_slug' => 'disaster-risk-reduction',
+                'suggestion_terms' => ['fire', 'earthquake', 'evacuation', 'disaster'],
+                'suggestion_reason' => 'Matched keyword rule: Disaster Risk Reduction Keywords',
                 'year' => 2026,
                 'date' => '2026-08-18',
                 'title' => 'Mandatory Fire and Earthquake Evacuation Protocols for Commercial Establishments',
@@ -2871,6 +3098,9 @@ class DemoDataSeeder extends Seeder
                 'number' => 'EO-2026-002',
                 'type_code' => 'executive_order',
                 'category_slug' => 'peace-and-order',
+                'suggested_category_slug' => 'peace-and-order',
+                'suggestion_terms' => ['badac', 'peace and order', 'patrol'],
+                'suggestion_reason' => 'Matched keyword rule: Peace & Order Keywords',
                 'year' => 2026,
                 'date' => '2026-08-25',
                 'title' => 'Creating Barangay Anti-Drug Abuse Council (BADAC) Special Task Force',
@@ -2883,6 +3113,9 @@ class DemoDataSeeder extends Seeder
                 'number' => 'RES-2026-005',
                 'type_code' => 'resolution',
                 'category_slug' => 'infrastructure',
+                'suggested_category_slug' => 'infrastructure',
+                'suggestion_terms' => ['drainage', 'culvert', 'infrastructure'],
+                'suggestion_reason' => 'Matched keyword rule: Infrastructure Keywords',
                 'year' => 2026,
                 'date' => '2026-08-28',
                 'title' => 'Drainage Canal Desilting and Culvert Rehabilitation along Purok 4 Creek',
@@ -2892,6 +3125,13 @@ class DemoDataSeeder extends Seeder
                 'submitted_at' => '2026-08-29 09:00:00',
                 'returned_at' => '2026-08-30 15:00:00',
                 'return_comment' => 'Please re-check the cost estimate in Section 4 against Municipal Engineering schedule of rates before resubmission.',
+                'is_project_related' => true,
+                'project_name' => 'Purok 4 Creek Drainage Desilting & Culvert Upgrade',
+                'project_location' => 'Purok 4 Creek Crossing, Barangay Sta. Felomina',
+                'approved_budget' => 1200000.00,
+                'project_start_date' => '2026-10-01',
+                'target_completion_date' => '2026-12-15',
+                'project_remarks' => 'Engineering schedule of unit costs under revision.',
             ],
             [
                 'number' => 'ORD-2026-005',
@@ -2911,6 +3151,9 @@ class DemoDataSeeder extends Seeder
                 'number' => 'RES-2026-006',
                 'type_code' => 'resolution',
                 'category_slug' => 'social-services',
+                'suggested_category_slug' => 'social-services',
+                'suggestion_terms' => ['senior citizen', 'pwd', 'assistance', 'subsidy'],
+                'suggestion_reason' => 'Matched keyword rule: Social Services Keywords',
                 'year' => 2026,
                 'date' => '2026-09-05',
                 'title' => 'Senior Citizen and PWD Quarterly Grocery Subsidy Program',
@@ -2946,7 +3189,7 @@ class DemoDataSeeder extends Seeder
     /**
      * Phase 2: 3 Superseded Documents.
      *
-     * @return array<int, array{number: string, type_code: string, category_slug: string, year: int, date: string, title: string, subject: string, keywords: array<string>, submitted_at: string, approved_at: string, superseded_at: string, supersede_reason: string, replacement_number: string, supersede_reference: string}>
+     * @return array<int, array{number: string, type_code: string, category_slug: string, year: int, date: string, title: string, subject: string, keywords: array<string>, submitted_at: string, approved_at: string, superseded_at: string, supersede_reason: string, replacement_number: string, supersede_reference: string, is_project_related?: bool, project_name?: string, project_location?: string, approved_budget?: float, project_start_date?: string, target_completion_date?: string, project_remarks?: string}>
      */
     protected function phase2SupersededDocumentsData(): array
     {

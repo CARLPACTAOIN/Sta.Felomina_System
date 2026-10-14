@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\DocumentStatus;
-use App\Enums\UserRole;
 use App\Notifications\DocumentWorkflowNotification;
 use Database\Factories\DocumentRecordFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -33,6 +32,13 @@ use Throwable;
  * @property Carbon $document_date
  * @property string $subject
  * @property string|null $keywords
+ * @property bool $is_project_related
+ * @property string|null $project_name
+ * @property string|null $project_location
+ * @property string|null $approved_budget
+ * @property Carbon|null $project_start_date
+ * @property Carbon|null $target_completion_date
+ * @property string|null $project_remarks
  * @property array<int, string>|null $category_suggestion_terms
  * @property string|null $category_suggestion_reason
  * @property Carbon|null $category_suggested_at
@@ -93,6 +99,13 @@ use Throwable;
     'document_date',
     'subject',
     'keywords',
+    'is_project_related',
+    'project_name',
+    'project_location',
+    'approved_budget',
+    'project_start_date',
+    'target_completion_date',
+    'project_remarks',
     'category_suggestion_terms',
     'category_suggestion_reason',
     'category_suggested_at',
@@ -278,6 +291,11 @@ class DocumentRecord extends Model
         return in_array($this->status, [DocumentStatus::Draft, DocumentStatus::NeedsRevision], true);
     }
 
+    public function canEditMetadata(): bool
+    {
+        return in_array($this->status, [DocumentStatus::Draft, DocumentStatus::NeedsRevision], true);
+    }
+
     public function canSubmitForApproval(): bool
     {
         return in_array($this->status, [DocumentStatus::Draft, DocumentStatus::NeedsRevision], true)
@@ -312,6 +330,33 @@ class DocumentRecord extends Model
     public function hasPublicPdfAccess(): bool
     {
         return in_array($this->status, [DocumentStatus::Published, DocumentStatus::Archived], true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $metadata
+     * @param  array<string, mixed>  $auditContext
+     */
+    public function updateMetadata(User $actor, array $metadata, array $auditContext = []): void
+    {
+        if (! $this->canEditMetadata()) {
+            throw ValidationException::withMessages([
+                'metadata' => 'Only Draft or Needs Revision records may have metadata edited.',
+            ]);
+        }
+
+        $verificationToken = $this->verification_token;
+
+        DB::transaction(function () use ($actor, $metadata, $auditContext, $verificationToken): void {
+            $this->forceFill($metadata);
+            $this->verification_token = $verificationToken;
+
+            $changedFields = array_keys($this->getDirty());
+            $this->save();
+
+            $this->recordAudit($actor, 'document_metadata_updated', 'Document metadata edited.', array_merge([
+                'changed_fields' => array_values(array_diff($changedFields, ['updated_at'])),
+            ], $auditContext));
+        });
     }
 
     public function submitForApproval(User $actor): void
@@ -367,7 +412,7 @@ class DocumentRecord extends Model
             ]);
         });
 
-        $this->creator->notify($this->notification('Document returned for revision.'));
+        $this->workflowSubmitter()->notify($this->notification('Document returned for revision.'));
     }
 
     public function approveForPublication(User $actor): DocumentFileVersion
@@ -428,7 +473,7 @@ class DocumentRecord extends Model
             throw $exception;
         }
 
-        $this->creator->notify($this->notification('Document approved and published.'));
+        $this->workflowSubmitter()->notify($this->notification('Document approved and published.'));
 
         return $fileVersion;
     }
@@ -557,6 +602,10 @@ class DocumentRecord extends Model
     {
         return [
             'document_date' => 'date',
+            'is_project_related' => 'boolean',
+            'approved_budget' => 'decimal:2',
+            'project_start_date' => 'date',
+            'target_completion_date' => 'date',
             'status' => DocumentStatus::class,
             'category_suggestion_terms' => 'array',
             'category_suggested_at' => 'datetime',
@@ -609,23 +658,31 @@ class DocumentRecord extends Model
     private function notifyCaptains(string $message): void
     {
         $captains = User::query()
-            ->where('role', UserRole::Captain->value)
+            ->role('captain')
             ->where('is_active', true)
             ->get();
 
         foreach ($captains as $captain) {
-            $captain->notify($this->notification($message));
+            $captain->notify($this->notification(
+                message: $message,
+                url: route('approvals.index', ['search' => $this->document_number], absolute: false).'#pending-approval-'.$this->id,
+            ));
         }
     }
 
-    private function notification(string $message): DocumentWorkflowNotification
+    private function workflowSubmitter(): User
+    {
+        return $this->submitter()->first() ?? $this->creator;
+    }
+
+    private function notification(string $message, ?string $url = null): DocumentWorkflowNotification
     {
         return new DocumentWorkflowNotification(
             documentRecordId: $this->id,
             documentNumber: $this->document_number,
             title: $this->title,
             message: $message,
-            url: route('documents.show', $this, absolute: false),
+            url: $url ?? route('documents.show', $this, absolute: false),
         );
     }
 }

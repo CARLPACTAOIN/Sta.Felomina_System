@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\UserRole;
 use App\Services\DashboardMetricsService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -14,7 +13,7 @@ class DashboardController extends Controller
         $user = $request->user();
         abort_unless($user !== null, 401);
 
-        $isPurokChairperson = $user->role === UserRole::PurokChairperson;
+        $isPurokChairperson = $user->isPurokChairperson();
 
         $metrics = $isPurokChairperson
             ? $metricsService->forPurokChairperson($user)

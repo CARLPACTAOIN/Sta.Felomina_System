@@ -4,6 +4,7 @@ use App\Enums\DocumentStatus;
 use App\Models\AuditLog;
 use App\Models\DocumentRecord;
 use App\Models\User;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
 function createLifecyclePublishedDocument(array $attributes = []): DocumentRecord
@@ -119,25 +120,23 @@ test('captain supersedes a published document with a replacement reference', fun
         ->and($document->supersede_reference)->toBe('Resolution No. 2026-211');
 });
 
-test('secretary and purok chairperson cannot change published document lifecycle', function (string $role) {
-    $user = $role === 'secretary'
-        ? User::factory()->create()
-        : User::factory()->purokChairperson()->create();
+test('secretary cannot change published document lifecycle', function () {
+    $secretary = User::factory()->create();
     $document = createLifecyclePublishedDocument();
 
-    Livewire::actingAs($user)
+    Livewire::actingAs($secretary)
         ->test('pages::documents.show', ['documentRecord' => $document])
         ->set('archiveReason', 'Not allowed.')
         ->call('archiveDocument')
         ->assertForbidden();
 
-    Livewire::actingAs($user)
+    Livewire::actingAs($secretary)
         ->test('pages::documents.show', ['documentRecord' => $document])
         ->set('revokeReason', 'Not allowed.')
         ->call('revokeDocument')
         ->assertForbidden();
 
-    Livewire::actingAs($user)
+    Livewire::actingAs($secretary)
         ->test('pages::documents.show', ['documentRecord' => $document])
         ->set('supersedeReason', 'Not allowed.')
         ->set('supersedeReference', 'Replacement reference')
@@ -146,10 +145,23 @@ test('secretary and purok chairperson cannot change published document lifecycle
 
     expect($document->refresh()->status)->toBe(DocumentStatus::Published);
     expect(AuditLog::query()->count())->toBe(0);
-})->with([
-    'secretary' => ['secretary'],
-    'purok chairperson' => ['purok chairperson'],
-]);
+});
+
+test('purok chairperson cannot access document detail page for lifecycle operations', function () {
+    $chairperson = User::factory()->purokChairperson()->create();
+    $document = createLifecyclePublishedDocument();
+
+    Livewire::actingAs($chairperson)
+        ->test('pages::documents.show', ['documentRecord' => $document])
+        ->assertForbidden();
+
+    $this->actingAs($chairperson)
+        ->get(route('documents.show', $document))
+        ->assertForbidden();
+
+    expect($document->refresh()->status)->toBe(DocumentStatus::Published);
+    expect(AuditLog::query()->count())->toBe(0);
+});
 
 test('lifecycle actions require reasons', function () {
     $captain = User::factory()->captain()->create();
@@ -219,7 +231,7 @@ test('non published records cannot transition through lifecycle actions', functi
 
     $component
         ->call($method)
-        ->assertHasErrors(['workflow']);
+        ->assertForbidden();
 
     expect($document->refresh()->status)->toBe($status);
     expect(AuditLog::query()->count())->toBe(0);
@@ -242,4 +254,23 @@ test('non published records cannot transition through lifecycle actions', functi
     'archived supersede' => [DocumentStatus::Archived, 'supersedeDocument', 'supersedeReason'],
     'revoked supersede' => [DocumentStatus::Revoked, 'supersedeDocument', 'supersedeReason'],
     'superseded supersede' => [DocumentStatus::Superseded, 'supersedeDocument', 'supersedeReason'],
+]);
+
+test('document record model enforces published status for lifecycle transitions', function (DocumentStatus $status) {
+    $captain = User::factory()->captain()->create();
+    $document = DocumentRecord::factory()->create(['status' => $status]);
+
+    expect(fn () => $document->archive($captain, 'Reason'))
+        ->toThrow(ValidationException::class);
+    expect(fn () => $document->revoke($captain, 'Reason'))
+        ->toThrow(ValidationException::class);
+    expect(fn () => $document->supersede($captain, 'Reason', null, 'REF-1'))
+        ->toThrow(ValidationException::class);
+})->with([
+    'draft' => [DocumentStatus::Draft],
+    'pending' => [DocumentStatus::PendingApproval],
+    'needs revision' => [DocumentStatus::NeedsRevision],
+    'archived' => [DocumentStatus::Archived],
+    'revoked' => [DocumentStatus::Revoked],
+    'superseded' => [DocumentStatus::Superseded],
 ]);

@@ -52,7 +52,7 @@ test('captain creates secretary with generated temporary password and audit even
 
     expect($temporaryPassword)->toBeString()
         ->and($staff->name)->toBe('New Secretary')
-        ->and($staff->role)->toBe(UserRole::Secretary)
+        ->and($staff->hasRole(UserRole::Secretary->value))->toBeTrue()
         ->and($staff->purok_id)->toBeNull()
         ->and($staff->is_active)->toBeTrue()
         ->and($staff->email_verified_at)->not->toBeNull()
@@ -90,7 +90,7 @@ test('captain must assign a purok when creating a purok chairperson', function (
 
     $staff = User::where('email', 'assigned.chair@example.test')->firstOrFail();
 
-    expect($staff->role)->toBe(UserRole::PurokChairperson)
+    expect($staff->hasRole(UserRole::PurokChairperson->value))->toBeTrue()
         ->and($staff->purok_id)->toBe($purok->id);
 });
 
@@ -109,7 +109,7 @@ test('non purok roles cannot keep a purok assignment', function () {
 
     $staff = User::where('email', 'secretary.with.purok@example.test')->firstOrFail();
 
-    expect($staff->role)->toBe(UserRole::Secretary)
+    expect($staff->hasRole(UserRole::Secretary->value))->toBeTrue()
         ->and($staff->purok_id)->toBeNull();
 });
 
@@ -154,7 +154,7 @@ test('captain updates staff profile role and purok assignment with audit events'
 
     expect($staff->name)->toBe('Updated Chair')
         ->and($staff->email)->toBe('updated.chair@example.test')
-        ->and($staff->role)->toBe(UserRole::PurokChairperson)
+        ->and($staff->hasRole(UserRole::PurokChairperson->value))->toBeTrue()
         ->and($staff->purok_id)->toBe($purok->id);
 
     $this->assertDatabaseHas('audit_logs', [
@@ -225,7 +225,7 @@ test('captain cannot remove the last active captain by role change', function ()
         ->call('updateStaff')
         ->assertHasErrors(['editRole']);
 
-    expect($captain->refresh()->role)->toBe(UserRole::Captain);
+    expect($captain->refresh()->hasRole(UserRole::Captain->value))->toBeTrue();
 });
 
 test('captain resets another staff password and sees generated password once', function () {

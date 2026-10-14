@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             DocumentTaxonomySeeder::class,
             PurokSeeder::class,
+            RolePermissionSeeder::class,
             AccountSeeder::class,
             DemoDataSeeder::class,
         ]);

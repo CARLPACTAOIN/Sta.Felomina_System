@@ -97,6 +97,10 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            'dump' => [
+                'dump_binary_path' => env('PG_DUMP_PATH'),
+                'psql_binary_path' => env('PSQL_PATH'),
+            ],
         ],
 
         'sqlsrv' => [

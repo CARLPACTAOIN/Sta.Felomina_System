@@ -4,7 +4,10 @@
         @include('partials.head')
     </head>
     <body class="min-h-screen bg-[#f4f7f5] antialiased dark:bg-slate-950">
-        @php($role = auth()->user()->role)
+        @php
+            $user = auth()->user();
+            $unreadNotificationsCount = $user?->unreadNotifications()->count() ?? 0;
+        @endphp
 
         <flux:sidebar sticky collapsible="mobile" class="border-e-0! bg-[linear-gradient(180deg,#0b2d20,#0f3e2d_68%,#164933)]! text-white shadow-xl shadow-barangay-950/10">
             <flux:sidebar.header class="border-b border-white/10 pb-4">
@@ -13,43 +16,59 @@
             </flux:sidebar.header>
 
             <flux:sidebar.nav class="mt-4">
-                <flux:sidebar.group :heading="__('Workspace')" class="[&_[data-flux-sidebar-group-heading]]:text-emerald-200/60">
+                <flux:sidebar.group :heading="__('Workspace')" class="**:data-flux-sidebar-group-heading:text-emerald-200/60">
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
 
-                    @if ($role->canManageDocuments())
+                    <flux:sidebar.item
+                        icon="bell"
+                        :href="route('notifications.index')"
+                        :current="request()->routeIs('notifications.*')"
+                        :badge="$unreadNotificationsCount > 0 ? ($unreadNotificationsCount > 99 ? '99+' : (string) $unreadNotificationsCount) : null"
+                        wire:navigate
+                    >
+                        {{ __('Notifications') }}
+                    </flux:sidebar.item>
+
+                    @if ($user->can('documents.view'))
                         <flux:sidebar.item icon="document-text" :href="route('documents.index')" :current="request()->routeIs('documents.*')" wire:navigate>
                             {{ __('Document Archive') }}
                         </flux:sidebar.item>
+                    @endif
+
+                    @if ($user->can('documents.review'))
                         <flux:sidebar.item icon="inbox-arrow-down" :href="route('approvals.index')" :current="request()->routeIs('approvals.*')" wire:navigate>
-                            {{ $role === \App\Enums\UserRole::Captain ? __('Pending Approvals') : __('Approval Status') }}
+                            {{ __('Pending Approvals') }}
                         </flux:sidebar.item>
                     @endif
 
                     <flux:sidebar.item icon="users" :href="route('residents.index')" :current="request()->routeIs('residents.*')" wire:navigate>
-                        {{ $role === \App\Enums\UserRole::PurokChairperson ? __('Purok Residents') : __('Resident Directory') }}
+                        {{ $user->isPurokChairperson() ? __('Purok Residents') : __('Resident Directory') }}
                     </flux:sidebar.item>
                     <flux:sidebar.item icon="home-modern" :href="route('households.index')" :current="request()->routeIs('households.*')" wire:navigate>
                         {{ __('Households') }}
                     </flux:sidebar.item>
                     <flux:sidebar.item icon="chart-bar-square" :href="route('reports.index')" :current="request()->routeIs('reports.*')" wire:navigate>
-                        {{ $role === \App\Enums\UserRole::PurokChairperson ? __('Purok Summary') : __('Reports') }}
+                        {{ $user->isPurokChairperson() ? __('Purok Summary') : __('Reports') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
 
-                @if ($role->canManageDocuments() || $role === \App\Enums\UserRole::Captain)
-                    <flux:sidebar.group :heading="__('Administration')" class="mt-5 [&_[data-flux-sidebar-group-heading]]:text-emerald-200/60">
-                        @if ($role->canManageDocuments())
+                @if ($user->can('categorization-rules.manage') || $user->can('staff.manage') || $user->can('audit-logs.view'))
+                    <flux:sidebar.group :heading="__('Administration')" class="mt-5 **:data-flux-sidebar-group-heading:text-emerald-200/60">
+                        @if ($user->can('categorization-rules.manage'))
                             <flux:sidebar.item icon="adjustments-horizontal" :href="route('categorization-rules.index')" :current="request()->routeIs('categorization-rules.*')" wire:navigate>
                                 {{ __('Categorization Rules') }}
                             </flux:sidebar.item>
                         @endif
 
-                        @if ($role === \App\Enums\UserRole::Captain)
+                        @if ($user->can('staff.manage'))
                             <flux:sidebar.item icon="user-group" :href="route('staff-accounts.index')" :current="request()->routeIs('staff-accounts.*')" wire:navigate>
                                 {{ __('Staff Accounts') }}
                             </flux:sidebar.item>
+                        @endif
+
+                        @if ($user->can('audit-logs.view'))
                             <flux:sidebar.item icon="clock" :href="route('audit-logs.index')" :current="request()->routeIs('audit-logs.*')" wire:navigate>
                                 {{ __('Audit Logs') }}
                             </flux:sidebar.item>
@@ -58,7 +77,7 @@
                 @endif
 
                 @if (Route::has('verification.preview'))
-                    <flux:sidebar.group :heading="__('Preview')" class="mt-5 [&_[data-flux-sidebar-group-heading]]:text-emerald-200/60">
+                    <flux:sidebar.group :heading="__('Preview')" class="mt-5 **:data-flux-sidebar-group-heading:text-emerald-200/60">
                         <flux:sidebar.item icon="qr-code" :href="route('verification.preview', ['state' => 'published'])" :current="request()->routeIs('verification.preview')" wire:navigate>
                             {{ __('Public Verification') }}
                         </flux:sidebar.item>
@@ -73,7 +92,7 @@
             </div>
         </flux:sidebar>
 
-        <flux:header class="sticky top-0 z-15 min-h-[74px] border-b border-[#e2e8e4] bg-white/88 px-4 backdrop-blur-md sm:px-8 dark:border-slate-800 dark:bg-slate-950/90">
+        <flux:header class="sticky top-0 z-15 min-h-18.5 border-b border-[#e2e8e4] bg-white/88 px-4 backdrop-blur-md sm:px-8 dark:border-slate-800 dark:bg-slate-950/90">
             <div class="flex items-center gap-3">
                 <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
                 <div class="min-w-0">
@@ -95,8 +114,15 @@
                     class="relative flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
                     aria-label="{{ __('Notifications') }}"
                 >
-                    <flux:icon.bell class="size-[18px]" />
-                    <span class="absolute right-2 top-2 size-2 rounded-full border-2 border-white bg-[#d65a52] dark:border-slate-800"></span>
+                    <flux:icon.bell class="size-4.5" />
+                    @if ($unreadNotificationsCount > 0)
+                        <span
+                            data-testid="header-unread-badge"
+                            class="absolute -top-1 -right-1 flex min-w-5 h-5 items-center justify-center rounded-full bg-[#d65a52] px-1 text-[10px] font-bold leading-none text-white shadow-xs"
+                        >
+                            {{ $unreadNotificationsCount > 99 ? '99+' : $unreadNotificationsCount }}
+                        </span>
+                    @endif
                 </a>
             </div>
         </flux:header>

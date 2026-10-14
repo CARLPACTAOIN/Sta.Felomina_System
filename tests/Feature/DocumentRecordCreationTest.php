@@ -89,18 +89,27 @@ test('suggested numbering uses the next sequence for the selected type and year'
 
 test('purok chairperson cannot create document records through the livewire action', function () {
     $chairperson = User::factory()->purokChairperson()->create();
-    $type = DocumentType::factory()->create();
-    $category = DocumentCategory::factory()->create();
 
     Livewire::actingAs($chairperson)
         ->test('pages::documents.create')
-        ->set('documentTypeId', (string) $type->id)
-        ->set('documentCategoryId', (string) $category->id)
-        ->set('documentNumber', 'DOC-2026-001')
-        ->set('title', 'Unauthorized document')
-        ->set('documentDate', '2026-09-09')
-        ->set('subject', 'This role must not create document records.')
-        ->call('save')
+        ->assertForbidden();
+
+    $this->actingAs($chairperson)
+        ->get(route('documents.create'))
+        ->assertForbidden();
+
+    $this->assertDatabaseCount('document_records', 0);
+});
+
+test('captain cannot create document records through the route or livewire action', function () {
+    $captain = User::factory()->captain()->create();
+
+    Livewire::actingAs($captain)
+        ->test('pages::documents.create')
+        ->assertForbidden();
+
+    $this->actingAs($captain)
+        ->get(route('documents.create'))
         ->assertForbidden();
 
     $this->assertDatabaseCount('document_records', 0);

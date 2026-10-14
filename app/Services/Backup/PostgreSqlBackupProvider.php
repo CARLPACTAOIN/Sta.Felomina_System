@@ -75,8 +75,8 @@ class PostgreSqlBackupProvider
      */
     protected function resolvePgDumpBinary(): string
     {
-        $custom = env('PG_DUMP_PATH');
-        if ($custom && file_exists($custom)) {
+        $custom = config('database.connections.pgsql.dump.dump_binary_path');
+        if (is_string($custom) && $custom !== '' && file_exists($custom)) {
             return $custom;
         }
 
@@ -101,8 +101,8 @@ class PostgreSqlBackupProvider
      */
     protected function resolvePsqlBinary(): string
     {
-        $custom = env('PSQL_PATH');
-        if ($custom && file_exists($custom)) {
+        $custom = config('database.connections.pgsql.dump.psql_binary_path');
+        if (is_string($custom) && $custom !== '' && file_exists($custom)) {
             return $custom;
         }
 

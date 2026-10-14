@@ -16,14 +16,4 @@ enum UserRole: string
             self::PurokChairperson => 'Purok Chairperson',
         };
     }
-
-    public function canManageDocuments(): bool
-    {
-        return in_array($this, [self::Captain, self::Secretary], true);
-    }
-
-    public function canViewBarangayResidents(): bool
-    {
-        return in_array($this, [self::Captain, self::Secretary], true);
-    }
 }

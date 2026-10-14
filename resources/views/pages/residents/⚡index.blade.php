@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\ResidentStatus;
-use App\Enums\UserRole;
+use App\Enums\StaffPermission;
 use App\Models\AuditLog;
 use App\Models\Household;
 use App\Models\Purok;
@@ -64,7 +64,7 @@ new #[Title('Residents')] class extends Component
         $user = $this->user();
         $this->status = ResidentStatus::Active->value;
 
-        if ($user->role === UserRole::PurokChairperson && $user->purok_id !== null) {
+        if ($user->isPurokChairperson() && $user->purok_id !== null) {
             $this->purokFilter = (string) $user->purok_id;
             $this->purokId = (string) $user->purok_id;
         }
@@ -73,6 +73,8 @@ new #[Title('Residents')] class extends Component
     public function createResident(bool $force = false): void
     {
         $actor = $this->user();
+        $this->authorizeResidentManagement($actor);
+
         $validated = $this->validate($this->createRules(), attributes: $this->validationAttributes());
         $purokId = $this->authorizedPurokId($actor, $validated['purokId'] ?? null);
         $household = $this->authorizedHouseholdFor((int) $validated['householdId'], $purokId);
@@ -181,6 +183,7 @@ new #[Title('Residents')] class extends Component
     public function updateResident(): void
     {
         $actor = $this->user();
+        $this->authorizeResidentManagement($actor);
 
         abort_unless($this->editingResidentId !== null, 404);
 
@@ -340,7 +343,15 @@ new #[Title('Residents')] class extends Component
 
     public function canViewBarangayWide(): bool
     {
-        return $this->user()->role->canViewBarangayResidents();
+        return $this->user()->canViewBarangayResidents();
+    }
+
+    public function canManageResidents(): bool
+    {
+        $user = $this->user();
+
+        return $user->can(StaffPermission::ManageResidentsBarangay->value)
+            || $user->can(StaffPermission::ManageResidentsAssigned->value);
     }
 
     /**
@@ -438,11 +449,13 @@ new #[Title('Residents')] class extends Component
 
     private function authorizedPurokId(User $actor, mixed $requestedPurokId): int
     {
-        if ($actor->role === UserRole::PurokChairperson) {
+        if ($actor->can(StaffPermission::ManageResidentsAssigned->value) && ! $actor->can(StaffPermission::ManageResidentsBarangay->value)) {
             abort_if($actor->purok_id === null, 403);
 
             return $actor->purok_id;
         }
+
+        abort_unless($actor->can(StaffPermission::ManageResidentsBarangay->value), 403);
 
         return (int) $requestedPurokId;
     }
@@ -470,10 +483,12 @@ new #[Title('Residents')] class extends Component
         $query = Resident::query();
         $user = $this->user();
 
-        if ($user->role === UserRole::PurokChairperson) {
+        if ($user->can(StaffPermission::ViewResidentsAssigned->value) && ! $user->can(StaffPermission::ViewResidentsBarangay->value)) {
             abort_if($user->purok_id === null, 403);
 
             $query->where('residents.purok_id', $user->purok_id);
+        } else {
+            abort_unless($user->can(StaffPermission::ViewResidentsBarangay->value), 403);
         }
 
         return $query;
@@ -487,10 +502,12 @@ new #[Title('Residents')] class extends Component
         $query = Household::query();
         $user = $this->user();
 
-        if ($user->role === UserRole::PurokChairperson) {
+        if ($user->can(StaffPermission::ViewHouseholdsAssigned->value) && ! $user->can(StaffPermission::ViewHouseholdsBarangay->value)) {
             abort_if($user->purok_id === null, 403);
 
             $query->where('purok_id', $user->purok_id);
+        } else {
+            abort_unless($user->can(StaffPermission::ViewHouseholdsBarangay->value), 403);
         }
 
         return $query;
@@ -503,6 +520,15 @@ new #[Title('Residents')] class extends Component
         abort_unless($user instanceof User, 403);
 
         return $user;
+    }
+
+    private function authorizeResidentManagement(User $actor): void
+    {
+        abort_unless(
+            $actor->can(StaffPermission::ManageResidentsBarangay->value)
+                || $actor->can(StaffPermission::ManageResidentsAssigned->value),
+            403,
+        );
     }
 
     private function resetCreateForm(): void
@@ -532,7 +558,7 @@ new #[Title('Residents')] class extends Component
 ?>
 
 <div class="app-content">
-    @php($isPurokChairperson = auth()->user()->role === \App\Enums\UserRole::PurokChairperson)
+    @php($isPurokChairperson = auth()->user()->isPurokChairperson())
 
     <x-page-header
         :eyebrow="$isPurokChairperson ? __('Assigned purok only') : __('Barangay-wide access')"
@@ -546,7 +572,8 @@ new #[Title('Residents')] class extends Component
         <x-metric-card :label="__('Households')" :value="$this->householdCount" icon="home-modern" :hint="__('Shared address records')" />
     </div>
 
-    <x-panel :title="__('New resident')" :description="__('Search first, then create a profile attached to a household.')">
+    @if ($this->canManageResidents())
+        <x-panel :title="__('New resident')" :description="__('Search first, then create a profile attached to a household.')">
         @if ($this->duplicateResidents->isNotEmpty())
             <flux:callout variant="warning" icon="exclamation-triangle" class="mb-4">
                 <div class="space-y-3">
@@ -696,7 +723,8 @@ new #[Title('Residents')] class extends Component
                 <flux:button type="submit" variant="primary" icon="user-plus" wire:loading.attr="disabled">{{ __('Create resident') }}</flux:button>
             </div>
         </form>
-    </x-panel>
+        </x-panel>
+    @endif
 
     <x-panel :title="__('Resident records')" :padding="false">
         <div class="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row dark:border-slate-700">
@@ -750,7 +778,9 @@ new #[Title('Residents')] class extends Component
                             <td>{{ $resident->household->household_code }}</td>
                             <td><flux:badge>{{ $resident->status->label() }}</flux:badge></td>
                             <td class="text-right">
-                                <flux:button size="sm" variant="outline" wire:click="beginEdit({{ $resident->id }})">{{ __('Edit') }}</flux:button>
+                                @if ($this->canManageResidents())
+                                    <flux:button size="sm" variant="outline" wire:click="beginEdit({{ $resident->id }})">{{ __('Edit') }}</flux:button>
+                                @endif
                             </td>
                         </tr>
                     @empty
@@ -765,7 +795,7 @@ new #[Title('Residents')] class extends Component
         </div>
     </x-panel>
 
-    @if ($editingResidentId !== null)
+    @if ($this->canManageResidents() && $editingResidentId !== null)
         <x-panel :title="__('Edit resident')" :description="__('Status changes are audited instead of deleting resident records.')">
             <form wire:submit="updateResident" class="grid gap-4 lg:grid-cols-4">
                 <flux:field>

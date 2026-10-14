@@ -447,7 +447,7 @@ test('tier 4: full disaster recovery drill: complete data loss followed by full 
     $this->seed(DocumentTaxonomySeeder::class);
     $this->seed(AccountSeeder::class);
 
-    $secretary = User::query()->where('role', UserRole::Secretary->value)->firstOrFail();
+    $secretary = User::role(UserRole::Secretary->value)->firstOrFail();
     $type = DocumentType::query()->firstOrFail();
     $category = DocumentCategory::query()->firstOrFail();
 

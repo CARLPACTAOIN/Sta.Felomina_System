@@ -97,7 +97,7 @@ The system shall:
 3. assign each document a permanent QR verification identity;
 4. allow the public to verify published documents through QR scanning without logging in;
 5. support a controlled Secretary-to-Captain approval workflow;
-6. automatically suggest document categories using configurable rules;
+6. automatically assign document categories using configurable rules, with audited manual exceptions;
 7. preserve approved document history instead of silently overwriting official records;
 8. allow Purok Chairpersons to maintain resident records for their assigned purok;
 9. provide simple operational dashboards and reports;
@@ -175,10 +175,10 @@ The Captain may:
 - view the full dashboard;
 - view all document records;
 - review pending documents;
+- view uploaded Draft PDFs for review;
 - approve documents;
 - return documents for revision;
 - add review comments;
-- edit document metadata when necessary;
 - archive, revoke, or supersede published documents;
 - manage staff accounts;
 - activate/deactivate staff accounts;
@@ -189,7 +189,9 @@ The Captain may:
 - view audit logs;
 - initiate/download allowed backups if a backup UI is provided.
 
-The Captain is the **final digital approver** of official documents.
+The Captain is the **final digital approver** of official documents. The Captain
+does not create or edit Draft/Needs Revision records, upload or replace their
+PDFs, download their QR images, or submit/resubmit them for approval.
 
 ## 7.2 Barangay Secretary
 
@@ -209,7 +211,7 @@ The Secretary may:
 - manage document metadata according to status rules;
 - search and retrieve document records;
 - manage categorization rules if authorized;
-- manually override suggested categories;
+- correct automatically assigned categories or select a category when no rule matches;
 - view residents across the barangay;
 - view reports;
 - view relevant audit history.
@@ -270,17 +272,18 @@ There is no public searchable document portal in Capstone V1.
 | Capability | Captain | Secretary | Purok Chair | Official | Resident/Public |
 |---|---:|---:|---:|---:|---:|
 | Login | Yes | Yes | Yes | No | No |
-| Create document record | Yes | Yes | No | No | No |
-| Edit draft document | Yes | Yes | No | No | No |
-| Generate/download document QR | Yes | Yes | No | No | No |
-| Upload final PDF | Yes | Yes | No | No | No |
-| Submit for approval | Yes | Yes | No | No | No |
+| Create document record | No | Yes | No | No | No |
+| Edit Draft/Needs Revision document | No | Yes | No | No | No |
+| Generate/download document QR | No | Yes | No | No | No |
+| Upload/replace Draft PDF | No | Yes | No | No | No |
+| View Draft PDF for review | Yes | Yes | No | No | No |
+| Submit/resubmit for approval | No | Yes | No | No | No |
 | Approve document | Yes | No | No | No | No |
 | Return for revision | Yes | No | No | No | No |
 | Archive/revoke/supersede published document | Yes | Limited/No by default | No | No | No |
 | View all document records | Yes | Yes | No | QR only | QR only |
 | Manage categorization rules | Yes | Yes | No | No | No |
-| Override suggested category | Yes | Yes | No | No | No |
+| Correct automatically assigned category | No | Yes | No | No | No |
 | Manage staff accounts | Yes | No | No | No | No |
 | View all residents | Yes | Yes | No | No | No |
 | Manage residents in assigned purok | Optional | Optional | Yes | No | No |
@@ -692,7 +695,7 @@ Rule-based categorization is a core requirement.
 
 ## 16.1 Purpose
 
-The system automatically suggests a category based on document metadata.
+The system automatically assigns a category based on document metadata.
 
 It is intended to improve consistency and reduce manual sorting.
 
@@ -777,12 +780,17 @@ Captain and Secretary may:
 The system shall:
 
 1. evaluate applicable active rules;
-2. produce a suggested Primary Category;
-3. optionally show matched terms/reason;
-4. allow Secretary/Captain to override the suggestion;
-5. save the final selected category.
+2. automatically assign the highest-priority matching Primary Category;
+3. show the matched rule, terms, and reason;
+4. ignore a changed category value unless the Secretary explicitly enters correction mode;
+5. allow the Secretary to correct an incorrect automatic assignment;
+6. require the Secretary to select an active category when no rule matches;
+7. recalculate from document type, title, subject, and keywords when those fields change and immediately before save;
+8. preserve the suggested category, matched terms, reason, rule, final category, and audited manual-exception context.
 
-Automatic categorization must assist the user, not permanently lock an incorrect result.
+No OCR, PDF text extraction, AI classification, or fallback Unclassified category
+is used. For Draft and Needs Revision edits, a no-match result retains the
+current category for required manual confirmation.
 
 ---
 
@@ -1031,6 +1039,9 @@ Captain:
 Secretary:
 - document approved;
 - document returned for revision.
+
+Return and approval notifications target the latest submitting Secretary. Legacy
+records without a submitter fall back to the original creator.
 
 No SMS or email notification infrastructure is required.
 
@@ -1298,7 +1309,8 @@ These rules are mandatory.
 11. Archived/Revoked/Superseded documents keep working verification URLs.
 12. Published records are not permanently deleted in normal operation.
 13. Rule-based categorization is metadata-driven, not OCR-driven.
-14. Category suggestions may be manually overridden.
+14. Matching rules assign the category automatically; only the Secretary may
+    make an audited correction or supply the required category when no rule matches.
 15. Purok Chairpersons can only access residents in their assigned purok.
 16. Resident duplicate detection warns but does not blindly block.
 17. Bulk historical encoding is not part of Capstone V1 delivery.
@@ -1328,11 +1340,13 @@ These rules are mandatory.
 ## 34.2 Categorization
 
 1. System evaluates active rules using metadata.
-2. System suggests Primary Category.
-3. System may show matched keywords.
-4. Secretary accepts or overrides.
-5. Final category is saved.
-6. Override is auditable.
+2. System automatically assigns the highest-priority matching Primary Category.
+3. System shows the matched rule, terms, and reason.
+4. Secretary normally continues without selecting a category.
+5. If the automatic result is wrong, Secretary enters correction mode and selects an active category.
+6. If no rule matches, Secretary must select and confirm an active category.
+7. System recalculates immediately before save and stores explainability evidence.
+8. Every correction or no-match manual assignment is auditable.
 
 ## 34.3 Approval
 
@@ -1395,6 +1409,8 @@ These rules are mandatory.
 ## 35.2 Document Records
 
 - Secretary can create Draft record without PDF.
+- Captain receives `403` when attempting document preparation routes or actions.
+- Existing Captain-created Drafts remain editable and submittable by Secretaries.
 - Document number uniqueness is validated.
 - Metadata can be edited while allowed by status.
 - Search/filter works using required fields.
@@ -1421,8 +1437,11 @@ These rules are mandatory.
 ## 35.5 Categorization
 
 - Rules can be created/edited by authorized users.
-- System suggests category from metadata.
-- Manual override works.
+- System automatically assigns category from type, title, subject, and keywords.
+- Matching rule priority and optional document-type conditions are honored.
+- Secretary can explicitly correct a matched category.
+- No-match records require a manual active category and an audit event.
+- Save-time recalculation prevents category-property tampering.
 - Final category is searchable/reportable.
 
 ## 35.6 Residents

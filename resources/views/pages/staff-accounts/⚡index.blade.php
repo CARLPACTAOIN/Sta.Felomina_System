@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\StaffPermission;
 use App\Enums\UserRole;
 use App\Models\AuditLog;
 use App\Models\Purok;
@@ -46,11 +47,11 @@ new #[Title('Staff Accounts')] class extends Component
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => $temporaryPassword,
-            'role' => $selectedRole,
             'purok_id' => $this->purokIdFor($selectedRole, $validated['purokId'] ?? null),
             'is_active' => true,
         ]);
 
+        $staff->syncRoles($selectedRole->value);
         $staff->forceFill(['email_verified_at' => now()])->save();
 
         AuditLog::record($actor, 'account_created', $staff, 'Staff account created.', [
@@ -74,7 +75,7 @@ new #[Title('Staff Accounts')] class extends Component
         $this->editingUserId = $staff->id;
         $this->editName = $staff->name;
         $this->editEmail = $staff->email;
-        $this->editRole = $staff->role->value;
+        $this->editRole = $staff->staffRole()?->value ?? UserRole::Secretary->value;
         $this->editPurokId = $staff->purok_id === null ? '' : (string) $staff->purok_id;
         $this->editIsActive = $staff->is_active;
     }
@@ -112,20 +113,20 @@ new #[Title('Staff Accounts')] class extends Component
             ]);
         }
 
-        $originalRole = $staff->role;
+        $originalRole = $staff->staffRole();
         $originalActive = $staff->is_active;
 
         $staff->forceFill([
             'name' => $validated['editName'],
             'email' => $validated['editEmail'],
-            'role' => $nextRole,
             'purok_id' => $this->purokIdFor($nextRole, $validated['editPurokId'] ?? null),
             'is_active' => $nextActive,
         ])->save();
+        $staff->syncRoles($nextRole->value);
 
         if ($originalRole !== $nextRole) {
             AuditLog::record($actor, 'account_role_changed', $staff, 'Staff account role changed.', [
-                'from' => $originalRole->value,
+                'from' => $originalRole?->value,
                 'to' => $nextRole->value,
             ]);
         }
@@ -157,7 +158,7 @@ new #[Title('Staff Accounts')] class extends Component
             ]);
         }
 
-        if ($this->removesLastActiveCaptain($staff, $staff->role, $nextActive)) {
+        if ($this->removesLastActiveCaptain($staff, $staff->staffRole(), $nextActive)) {
             throw ValidationException::withMessages([
                 'staff' => __('At least one active Captain account must remain.'),
             ]);
@@ -196,8 +197,7 @@ new #[Title('Staff Accounts')] class extends Component
     public function staffAccounts(): EloquentCollection
     {
         return User::query()
-            ->with('purok')
-            ->orderBy('role')
+            ->with(['purok', 'roles'])
             ->orderBy('name')
             ->get();
     }
@@ -227,7 +227,7 @@ new #[Title('Staff Accounts')] class extends Component
     {
         $user = Auth::user();
 
-        abort_unless($user instanceof User && $user->role === UserRole::Captain, 403);
+        abort_unless($user instanceof User && $user->can(StaffPermission::ManageStaffAccounts->value), 403);
 
         return $user;
     }
@@ -301,9 +301,9 @@ new #[Title('Staff Accounts')] class extends Component
         return filled($purokId) ? (int) $purokId : null;
     }
 
-    private function removesLastActiveCaptain(User $staff, UserRole $nextRole, bool $nextActive): bool
+    private function removesLastActiveCaptain(User $staff, ?UserRole $nextRole, bool $nextActive): bool
     {
-        if ($staff->role !== UserRole::Captain || ! $staff->is_active) {
+        if (! $staff->hasStaffRole(UserRole::Captain) || ! $staff->is_active) {
             return false;
         }
 
@@ -311,8 +311,7 @@ new #[Title('Staff Accounts')] class extends Component
             return false;
         }
 
-        return User::query()
-            ->where('role', UserRole::Captain->value)
+        return User::role(UserRole::Captain->value)
             ->where('is_active', true)
             ->count() <= 1;
     }
@@ -411,7 +410,7 @@ new #[Title('Staff Accounts')] class extends Component
                                     <p class="font-semibold text-slate-900 dark:text-white">{{ $staff->name }}</p>
                                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ $staff->email }}</p>
                                 </td>
-                                <td>{{ $staff->role->label() }}</td>
+                                <td>{{ $staff->staffRoleLabel() }}</td>
                                 <td>{{ $staff->purok?->name ?? __('Not assigned') }}</td>
                                 <td><x-status-badge :status="$staff->is_active ? __('Active') : __('Inactive')" /></td>
                                 <td>{{ $staff->created_at?->toFormattedDateString() }}</td>

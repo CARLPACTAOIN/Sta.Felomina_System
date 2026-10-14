@@ -40,8 +40,28 @@ class DocumentRecordFactory extends Factory
             'document_date' => fake()->dateTimeBetween('2026-01-01', '2026-12-31')->format('Y-m-d'),
             'subject' => fake()->paragraph(),
             'keywords' => fake()->words(3, true),
+            'is_project_related' => false,
+            'project_name' => null,
+            'project_location' => null,
+            'approved_budget' => null,
+            'project_start_date' => null,
+            'target_completion_date' => null,
+            'project_remarks' => null,
             'status' => DocumentStatus::Draft,
         ];
+    }
+
+    public function projectRelated(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_project_related' => true,
+            'project_name' => 'Barangay Drainage Improvement',
+            'project_location' => 'Purok 3, Barangay Sta. Felomina',
+            'approved_budget' => '1250000.00',
+            'project_start_date' => '2026-10-01',
+            'target_completion_date' => '2026-12-15',
+            'project_remarks' => 'Priority infrastructure project.',
+        ]);
     }
 
     public function published(): static

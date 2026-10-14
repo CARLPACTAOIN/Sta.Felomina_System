@@ -1,5 +1,5 @@
 <x-layouts::app :title="__('Reports')">
-    @php($isPurokChairperson = auth()->user()->role === \App\Enums\UserRole::PurokChairperson)
+    @php($isPurokChairperson = auth()->user()->isPurokChairperson())
     <div class="app-content">
         <x-page-header
             :title="$isPurokChairperson ? __('Purok Summary') : __('Reports')"

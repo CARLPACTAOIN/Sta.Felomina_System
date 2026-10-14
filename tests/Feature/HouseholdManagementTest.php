@@ -57,23 +57,32 @@ test('captain can create and update households across puroks with audit events',
     ]);
 });
 
-test('secretary can manage barangay wide households', function () {
+test('secretary can view but cannot manage barangay wide households', function () {
     $secretary = User::factory()->create();
     $purok = Purok::factory()->create(['name' => 'Purok 3']);
+    $household = Household::factory()->create([
+        'purok_id' => $purok->id,
+        'household_head_name' => 'Visible Household',
+    ]);
 
     Livewire::actingAs($secretary)
         ->test('pages::households.index')
+        ->assertSee('Visible Household')
         ->set('purokId', (string) $purok->id)
         ->set('address', 'Barangay Road')
         ->set('householdHeadName', 'Juan Dela Cruz')
         ->call('createHousehold')
-        ->assertHasNoErrors()
-        ->assertSee('Juan Dela Cruz');
+        ->assertForbidden();
 
-    $this->assertDatabaseHas('households', [
-        'purok_id' => $purok->id,
-        'household_head_name' => 'Juan Dela Cruz',
-    ]);
+    Livewire::actingAs($secretary)
+        ->test('pages::households.index')
+        ->call('beginEdit', $household->id)
+        ->set('editHouseholdHeadName', 'Blocked Update')
+        ->call('updateHousehold')
+        ->assertForbidden();
+
+    expect(Household::where('household_head_name', 'Juan Dela Cruz')->exists())->toBeFalse()
+        ->and($household->refresh()->household_head_name)->toBe('Visible Household');
 });
 
 test('purok chairperson only sees and manages assigned purok households', function () {

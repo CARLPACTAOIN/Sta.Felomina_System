@@ -77,11 +77,11 @@ test('draft pdf upload rejects non pdf files', function () {
     ]);
 });
 
-test('published documents cannot replace the draft pdf through the draft upload action', function () {
+test('captain cannot upload a draft pdf even while the document is editable', function () {
     Storage::fake('local');
 
     $captain = User::factory()->captain()->create();
-    $document = DocumentRecord::factory()->published()->create(['created_by_id' => $captain->id]);
+    $document = DocumentRecord::factory()->create(['created_by_id' => $captain->id]);
 
     Livewire::actingAs($captain)
         ->test('pages::documents.show', ['documentRecord' => $document])

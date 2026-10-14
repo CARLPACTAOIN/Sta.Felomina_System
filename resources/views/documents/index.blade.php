@@ -4,9 +4,11 @@
             :title="__('Document Archive')"
             :description="__('Search and retrieve official records across their full lifecycle.')"
         >
-            <x-slot:actions>
-                <flux:button variant="primary" icon="plus" :href="route('documents.create')" wire:navigate>{{ __('Create document record') }}</flux:button>
-            </x-slot:actions>
+            @can('create', \App\Models\DocumentRecord::class)
+                <x-slot:actions>
+                    <flux:button variant="primary" icon="plus" :href="route('documents.create')" wire:navigate>{{ __('Create document record') }}</flux:button>
+                </x-slot:actions>
+            @endcan
         </x-page-header>
 
         @if (session('status'))
@@ -25,7 +27,7 @@
                 <div class="min-w-0 flex-1">
                     <flux:field>
                         <flux:label>{{ __('Search') }}</flux:label>
-                        <flux:input name="q" icon="magnifying-glass" :value="$filters['q']" :placeholder="__('Number, title, subject, keyword...')" />
+                        <flux:input name="q" icon="magnifying-glass" :value="$filters['q']" :placeholder="__('Number, title, subject, keyword, project...')" />
                     </flux:field>
                 </div>
 
@@ -123,8 +125,10 @@
                     {{ $documents->links() }}
                 </div>
             @else
-                <x-empty-state :title="__('No document records yet')" :description="__('Create a Draft record first. Its permanent verification identity is created before the final PDF is uploaded.')" icon="document-text">
-                    <x-slot:action><flux:button variant="primary" icon="plus" :href="route('documents.create')" wire:navigate>{{ __('Create first Draft') }}</flux:button></x-slot:action>
+                <x-empty-state :title="__('No document records yet')" :description="__('Draft records created by the Barangay Secretary will appear here.')" icon="document-text">
+                    @can('create', \App\Models\DocumentRecord::class)
+                        <x-slot:action><flux:button variant="primary" icon="plus" :href="route('documents.create')" wire:navigate>{{ __('Create first Draft') }}</flux:button></x-slot:action>
+                    @endcan
                 </x-empty-state>
             @endif
         </x-panel>

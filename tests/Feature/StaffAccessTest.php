@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\DocumentRecord;
 use App\Models\User;
 
 test('public registration routes are unavailable', function () {
@@ -37,7 +38,6 @@ test('captain can render administrative foundation pages', function (string $rou
     $this->actingAs($user)->get(route($routeName))->assertSuccessful();
 })->with([
     'document archive' => 'documents.index',
-    'create document record' => 'documents.create',
     'pending approvals' => 'approvals.index',
     'categorization rules' => 'categorization-rules.index',
     'resident directory' => 'residents.index',
@@ -47,6 +47,30 @@ test('captain can render administrative foundation pages', function (string $rou
     'staff accounts' => 'staff-accounts.index',
     'audit logs' => 'audit-logs.index',
 ]);
+
+test('captain cannot open secretary document preparation routes or controls', function () {
+    $captain = User::factory()->captain()->create();
+    $document = DocumentRecord::factory()->create();
+
+    $this->actingAs($captain)
+        ->get(route('documents.create'))
+        ->assertForbidden();
+
+    $this->actingAs($captain)
+        ->get(route('documents.index'))
+        ->assertSuccessful()
+        ->assertDontSee('Create document record')
+        ->assertDontSee('Create first Draft');
+
+    $this->actingAs($captain)
+        ->get(route('documents.show', $document))
+        ->assertSuccessful()
+        ->assertDontSee('Edit Metadata')
+        ->assertDontSee('Download QR')
+        ->assertDontSee('Upload Draft PDF')
+        ->assertDontSee('Replace Draft PDF')
+        ->assertDontSee('Submit for Approval');
+});
 
 test('secretary cannot open captain-only administration', function (string $routeName) {
     $user = User::factory()->create();

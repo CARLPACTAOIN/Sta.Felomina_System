@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\DocumentRecord;
+use App\Policies\DocumentRecordPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Blaze\Blaze;
@@ -24,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(DocumentRecord::class, DocumentRecordPolicy::class);
+
         Blaze::optimize()->in(resource_path('views/components'));
 
         $this->configureDefaults();

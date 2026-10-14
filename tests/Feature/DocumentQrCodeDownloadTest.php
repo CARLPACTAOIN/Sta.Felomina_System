@@ -23,13 +23,13 @@ test('secretary downloads a qr svg for the document permanent verification url',
 });
 
 test('qr download keeps the same document verification identity across requests', function () {
-    $captain = User::factory()->captain()->create();
+    $secretary = User::factory()->create();
     $document = DocumentRecord::factory()->create([
         'verification_token' => 'StableTokenForRepeatedDownload1234567890ABCDE',
     ]);
 
-    $firstResponse = $this->actingAs($captain)->get(route('documents.qr-code', $document));
-    $secondResponse = $this->actingAs($captain)->get(route('documents.qr-code', $document));
+    $firstResponse = $this->actingAs($secretary)->get(route('documents.qr-code', $document));
+    $secondResponse = $this->actingAs($secretary)->get(route('documents.qr-code', $document));
 
     $document->refresh();
 
@@ -45,6 +45,10 @@ test('qr download requires an authenticated document manager', function () {
         ->assertRedirect(route('login'));
 
     $this->actingAs(User::factory()->purokChairperson()->create())
+        ->get(route('documents.qr-code', $document))
+        ->assertForbidden();
+
+    $this->actingAs(User::factory()->captain()->create())
         ->get(route('documents.qr-code', $document))
         ->assertForbidden();
 });

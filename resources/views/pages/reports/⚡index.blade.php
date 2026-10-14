@@ -2,7 +2,7 @@
 
 use App\Enums\DocumentStatus;
 use App\Enums\ResidentStatus;
-use App\Enums\UserRole;
+use App\Enums\StaffPermission;
 use App\Models\DocumentCategory;
 use App\Models\DocumentType;
 use App\Models\Purok;
@@ -41,7 +41,7 @@ new #[Title('Reports')] class extends Component
     {
         $user = $this->user();
 
-        if ($user->role === UserRole::PurokChairperson) {
+        if (! $user->can(StaffPermission::ViewDocumentReports->value)) {
             $this->reportType = 'resident';
             $this->purokId = (string) $user->purok_id;
         } else {
@@ -127,7 +127,7 @@ new #[Title('Reports')] class extends Component
             $this->dateFrom = '';
             $this->dateTo = '';
         } else {
-            if ($user->role !== UserRole::PurokChairperson) {
+            if ($user->can(StaffPermission::ViewResidentsBarangay->value)) {
                 $this->purokId = '';
             }
             $this->residentStatus = '';
@@ -149,7 +149,12 @@ new #[Title('Reports')] class extends Component
 
     public function isPurokChairperson(): bool
     {
-        return $this->user()->role === UserRole::PurokChairperson;
+        return $this->user()->isPurokChairperson();
+    }
+
+    public function canViewDocumentReports(): bool
+    {
+        return $this->user()->can(StaffPermission::ViewDocumentReports->value);
     }
 
     /**
@@ -188,7 +193,7 @@ new #[Title('Reports')] class extends Component
         $user = $this->user();
         $engine = app(ReportEngine::class);
 
-        if ($this->reportType === 'document' && ! $this->isPurokChairperson()) {
+        if ($this->reportType === 'document' && $this->canViewDocumentReports()) {
             return $engine->documentReport($user, [
                 'year' => $this->year,
                 'month' => $this->month,
@@ -264,7 +269,7 @@ new #[Title('Reports')] class extends Component
         </x-slot:actions>
     </x-page-header>
 
-    @if (! $this->isPurokChairperson())
+    @if ($this->canViewDocumentReports())
         <div class="flex border-b border-slate-200 dark:border-slate-800">
             <button
                 type="button"
@@ -286,7 +291,7 @@ new #[Title('Reports')] class extends Component
     @endif
 
     <x-panel :title="__('Filter Criteria')" :description="__('Configure the parameters for your generated report.')">
-        @if ($reportType === 'document' && ! $this->isPurokChairperson())
+        @if ($reportType === 'document' && $this->canViewDocumentReports())
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <flux:field>
                     <flux:label>{{ __('Year') }}</flux:label>
@@ -350,7 +355,7 @@ new #[Title('Reports')] class extends Component
             </div>
         @else
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                @if (! $this->isPurokChairperson())
+                @if ($this->user()->canViewBarangayResidents())
                     <flux:field>
                         <flux:label>{{ __('Purok') }}</flux:label>
                         <flux:select wire:model.live="purokId">
@@ -411,7 +416,7 @@ new #[Title('Reports')] class extends Component
     {{-- Summary Metrics Bar --}}
     @php($data = $this->reportData)
     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        @if ($reportType === 'document' && ! $this->isPurokChairperson())
+        @if ($reportType === 'document' && $this->canViewDocumentReports())
             <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                 <p class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Records in Report') }}</p>
                 <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{{ $data['total_count'] }}</p>
@@ -450,7 +455,7 @@ new #[Title('Reports')] class extends Component
 
     {{-- Results Table --}}
     <x-panel :padding="false">
-        @if ($reportType === 'document' && ! $this->isPurokChairperson())
+        @if ($reportType === 'document' && $this->canViewDocumentReports())
             @if ($data['records']->isNotEmpty())
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm text-slate-600 dark:text-slate-300">

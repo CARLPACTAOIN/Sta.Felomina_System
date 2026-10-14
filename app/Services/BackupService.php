@@ -63,7 +63,7 @@ class BackupService
                 if ($driver === 'sqlite') {
                     $this->dumpSqlite($targetSql);
                 } elseif ($driver === 'pgsql') {
-                    $dbConfig = (array) config("database.connections.{$connection}");
+                    $dbConfig = $this->getPostgreSqlConfig($connection);
                     $this->postgreSqlProvider->dump($targetSql, $dbConfig);
                 } else {
                     throw new RuntimeException("Unsupported database driver for backup: {$driver}");
@@ -132,7 +132,11 @@ class BackupService
             ];
 
             $manifestPath = $stagingDir.DIRECTORY_SEPARATOR.'manifest.json';
-            File::put($manifestPath, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            $jsonManifest = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            if ($jsonManifest === false) {
+                throw new RuntimeException('Failed to encode backup manifest to JSON.');
+            }
+            File::put($manifestPath, $jsonManifest);
 
             // 5. Build ZIP archive
             $zip = new ZipArchive;
@@ -197,11 +201,19 @@ class BackupService
         $entries = [];
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $stat = $zip->statIndex($i);
+            if ($stat === false) {
+                continue;
+            }
             $name = $stat['name'];
             if ($name === 'manifest.json' || str_ends_with($name, '/')) {
                 continue;
             }
-            $entries[$name] = hash('sha256', $zip->getFromIndex($i));
+            $entryContent = $zip->getFromIndex($i);
+            if ($entryContent === false) {
+                $zip->close();
+                throw new RuntimeException("Failed to read archive entry: {$name}");
+            }
+            $entries[$name] = hash('sha256', $entryContent);
         }
         ksort($entries);
 
@@ -263,7 +275,7 @@ class BackupService
                         $tempSql = storage_path('framework/cache/restore_'.Str::random(12).'.sql');
                         try {
                             File::put($tempSql, $sqlContent);
-                            $dbConfig = (array) config("database.connections.{$connection}");
+                            $dbConfig = $this->getPostgreSqlConfig($connection);
                             $this->postgreSqlProvider->restore($tempSql, $dbConfig);
                             $databaseRestored = true;
                         } finally {
@@ -292,23 +304,32 @@ class BackupService
 
                 for ($i = 0; $i < $zip->numFiles; $i++) {
                     $stat = $zip->statIndex($i);
+                    if ($stat === false) {
+                        continue;
+                    }
+
                     $name = $stat['name'];
 
                     if ($name === 'manifest.json' || $name === 'database.sql' || str_ends_with($name, '/')) {
                         continue;
                     }
 
+                    $entryContent = $zip->getFromIndex($i);
+                    if ($entryContent === false) {
+                        throw new RuntimeException("Failed to read archive entry for restore: {$name}");
+                    }
+
                     if (str_starts_with($name, 'storage/private/')) {
                         $subPath = substr($name, strlen('storage/private/'));
                         $targetPath = storage_path('app/private/'.$subPath);
                         File::ensureDirectoryExists(dirname($targetPath));
-                        file_put_contents($targetPath, $zip->getFromIndex($i));
+                        file_put_contents($targetPath, $entryContent);
                         $filesRestored++;
                     } elseif (str_starts_with($name, 'storage/public/')) {
                         $subPath = substr($name, strlen('storage/public/'));
                         $targetPath = storage_path('app/public/'.$subPath);
                         File::ensureDirectoryExists(dirname($targetPath));
-                        file_put_contents($targetPath, $zip->getFromIndex($i));
+                        file_put_contents($targetPath, $entryContent);
                         $filesRestored++;
                     }
                 }
@@ -418,5 +439,42 @@ class BackupService
         $pdo->exec($sqlContent);
         $pdo->exec('PRAGMA defer_foreign_keys = OFF;');
         $pdo->exec('PRAGMA foreign_keys = ON;');
+    }
+
+    /**
+     * Resolve and validate PostgreSQL connection configuration for backup/restore.
+     *
+     * @return array{host?: string, port?: int|string, database: string, username?: string, password?: string}
+     */
+    protected function getPostgreSqlConfig(string $connection): array
+    {
+        $database = config("database.connections.{$connection}.database");
+        if (! is_string($database) || $database === '') {
+            throw new RuntimeException("Database name not configured for connection [{$connection}].");
+        }
+
+        $config = ['database' => $database];
+
+        $host = config("database.connections.{$connection}.host");
+        if (is_string($host) && $host !== '') {
+            $config['host'] = $host;
+        }
+
+        $port = config("database.connections.{$connection}.port");
+        if (is_int($port) || (is_string($port) && $port !== '')) {
+            $config['port'] = $port;
+        }
+
+        $username = config("database.connections.{$connection}.username");
+        if (is_string($username) && $username !== '') {
+            $config['username'] = $username;
+        }
+
+        $password = config("database.connections.{$connection}.password");
+        if (is_string($password) && $password !== '') {
+            $config['password'] = $password;
+        }
+
+        return $config;
     }
 }

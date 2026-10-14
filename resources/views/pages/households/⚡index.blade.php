@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\UserRole;
+use App\Enums\StaffPermission;
 use App\Models\AuditLog;
 use App\Models\Household;
 use App\Models\Purok;
@@ -33,7 +33,7 @@ new #[Title('Households')] class extends Component
     {
         $user = $this->user();
 
-        if ($user->role === UserRole::PurokChairperson && $user->purok_id !== null) {
+        if ($user->isPurokChairperson() && $user->purok_id !== null) {
             $this->purokFilter = (string) $user->purok_id;
             $this->purokId = (string) $user->purok_id;
         }
@@ -42,6 +42,8 @@ new #[Title('Households')] class extends Component
     public function createHousehold(): void
     {
         $actor = $this->user();
+        $this->authorizeHouseholdManagement($actor);
+
         $validated = $this->validate($this->createRules(), attributes: $this->validationAttributes());
         $purokId = $this->authorizedPurokId($actor, $validated['purokId'] ?? null);
 
@@ -91,6 +93,7 @@ new #[Title('Households')] class extends Component
     public function updateHousehold(): void
     {
         $actor = $this->user();
+        $this->authorizeHouseholdManagement($actor);
 
         abort_unless($this->editingHouseholdId !== null, 404);
 
@@ -179,7 +182,15 @@ new #[Title('Households')] class extends Component
 
     public function canViewBarangayWide(): bool
     {
-        return $this->user()->role->canViewBarangayResidents();
+        return $this->user()->canViewBarangayHouseholds();
+    }
+
+    public function canManageHouseholds(): bool
+    {
+        $user = $this->user();
+
+        return $user->can(StaffPermission::ManageHouseholdsBarangay->value)
+            || $user->can(StaffPermission::ManageHouseholdsAssigned->value);
     }
 
     /**
@@ -242,11 +253,13 @@ new #[Title('Households')] class extends Component
 
     private function authorizedPurokId(User $actor, mixed $requestedPurokId): int
     {
-        if ($actor->role === UserRole::PurokChairperson) {
+        if ($actor->can(StaffPermission::ManageHouseholdsAssigned->value) && ! $actor->can(StaffPermission::ManageHouseholdsBarangay->value)) {
             abort_if($actor->purok_id === null, 403);
 
             return $actor->purok_id;
         }
+
+        abort_unless($actor->can(StaffPermission::ManageHouseholdsBarangay->value), 403);
 
         return (int) $requestedPurokId;
     }
@@ -259,10 +272,12 @@ new #[Title('Households')] class extends Component
         $query = Household::query();
         $user = $this->user();
 
-        if ($user->role === UserRole::PurokChairperson) {
+        if ($user->can(StaffPermission::ViewHouseholdsAssigned->value) && ! $user->can(StaffPermission::ViewHouseholdsBarangay->value)) {
             abort_if($user->purok_id === null, 403);
 
             $query->where('households.purok_id', $user->purok_id);
+        } else {
+            abort_unless($user->can(StaffPermission::ViewHouseholdsBarangay->value), 403);
         }
 
         return $query;
@@ -275,6 +290,15 @@ new #[Title('Households')] class extends Component
         abort_unless($user instanceof User, 403);
 
         return $user;
+    }
+
+    private function authorizeHouseholdManagement(User $actor): void
+    {
+        abort_unless(
+            $actor->can(StaffPermission::ManageHouseholdsBarangay->value)
+                || $actor->can(StaffPermission::ManageHouseholdsAssigned->value),
+            403,
+        );
     }
 
     private function resetCreateForm(): void
@@ -291,7 +315,7 @@ new #[Title('Households')] class extends Component
 ?>
 
 <div class="app-content">
-    @php($isPurokChairperson = auth()->user()->role === \App\Enums\UserRole::PurokChairperson)
+    @php($isPurokChairperson = auth()->user()->isPurokChairperson())
 
     <x-page-header
         :eyebrow="$isPurokChairperson ? __('Assigned purok only') : __('Barangay-wide access')"
@@ -304,7 +328,8 @@ new #[Title('Households')] class extends Component
         <x-metric-card :label="__('Household residents')" :value="$this->residentCount" icon="users" :hint="__('Residents attached to listed households')" />
     </div>
 
-    <x-panel :title="__('New household')" :description="__('Create a shared household address record before attaching residents.')">
+    @if ($this->canManageHouseholds())
+        <x-panel :title="__('New household')" :description="__('Create a shared household address record before attaching residents.')">
         <form wire:submit="createHousehold" class="grid gap-4 lg:grid-cols-2">
             @if ($this->canViewBarangayWide())
                 <flux:field>
@@ -345,7 +370,8 @@ new #[Title('Households')] class extends Component
                 <flux:button type="submit" variant="primary" icon="plus" wire:loading.attr="disabled">{{ __('Create household') }}</flux:button>
             </div>
         </form>
-    </x-panel>
+        </x-panel>
+    @endif
 
     <x-panel :title="__('Household records')" :padding="false">
         <div class="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row dark:border-slate-700">
@@ -383,7 +409,9 @@ new #[Title('Households')] class extends Component
                             <td>{{ $household->address }}</td>
                             <td>{{ $household->residents_count }}</td>
                             <td class="text-right">
-                                <flux:button size="sm" variant="outline" wire:click="beginEdit({{ $household->id }})">{{ __('Edit') }}</flux:button>
+                                @if ($this->canManageHouseholds())
+                                    <flux:button size="sm" variant="outline" wire:click="beginEdit({{ $household->id }})">{{ __('Edit') }}</flux:button>
+                                @endif
                             </td>
                         </tr>
                     @empty
@@ -398,7 +426,7 @@ new #[Title('Households')] class extends Component
         </div>
     </x-panel>
 
-    @if ($editingHouseholdId !== null)
+    @if ($this->canManageHouseholds() && $editingHouseholdId !== null)
         <x-panel :title="__('Edit household')" :description="__('Changes are audited. Households with residents cannot be moved to another Purok in this slice.')">
             <form wire:submit="updateHousehold" class="grid gap-4 lg:grid-cols-2">
                 @if ($this->canViewBarangayWide())

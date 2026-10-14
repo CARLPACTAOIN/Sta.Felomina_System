@@ -55,6 +55,18 @@
                                 <dd class="mt-1.5 text-sm font-semibold text-slate-900 dark:text-white">{{ $value }}</dd>
                             </div>
                         @endforeach
+                        @if ($document->is_project_related && filled($document->project_name))
+                            <div class="border-b border-slate-100 pb-4 dark:border-slate-800">
+                                <dt class="text-xs font-bold uppercase tracking-wider text-slate-400">{{ __('Project name') }}</dt>
+                                <dd class="mt-1.5 text-sm font-semibold text-slate-900 dark:text-white">{{ $document->project_name }}</dd>
+                            </div>
+                        @endif
+                        @if ($document->is_project_related && filled($document->project_location))
+                            <div class="border-b border-slate-100 pb-4 dark:border-slate-800">
+                                <dt class="text-xs font-bold uppercase tracking-wider text-slate-400">{{ __('Project location') }}</dt>
+                                <dd class="mt-1.5 text-sm font-semibold text-slate-900 dark:text-white">{{ $document->project_location }}</dd>
+                            </div>
+                        @endif
                     </dl>
 
                     @if (in_array($status, [\App\Enums\DocumentStatus::Archived, \App\Enums\DocumentStatus::Revoked, \App\Enums\DocumentStatus::Superseded], true))

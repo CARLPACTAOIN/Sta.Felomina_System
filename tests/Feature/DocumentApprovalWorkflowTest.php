@@ -7,6 +7,7 @@ use App\Models\DocumentRecord;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
 function storeWorkflowDraftPdf(string $path = 'document-drafts/prepared.pdf'): string
@@ -60,7 +61,7 @@ test('submit for approval fails without a draft pdf', function () {
     Livewire::actingAs($secretary)
         ->test('pages::documents.show', ['documentRecord' => $document])
         ->call('submitForApproval')
-        ->assertHasErrors(['workflow']);
+        ->assertForbidden();
 
     expect($document->refresh()->status)->toBe(DocumentStatus::Draft);
     expect(AuditLog::query()->count())->toBe(0);
@@ -79,12 +80,12 @@ test('submit for approval fails from invalid statuses', function () {
     Livewire::actingAs($secretary)
         ->test('pages::documents.show', ['documentRecord' => $document])
         ->call('submitForApproval')
-        ->assertHasErrors(['workflow']);
+        ->assertForbidden();
 
     expect($document->refresh()->status)->toBe(DocumentStatus::Published);
 });
 
-test('purok chairperson cannot submit documents for approval', function () {
+test('purok chairperson cannot access document detail page or submit documents', function () {
     Storage::fake('local');
 
     $chairperson = User::factory()->purokChairperson()->create();
@@ -94,10 +95,21 @@ test('purok chairperson cannot submit documents for approval', function () {
 
     Livewire::actingAs($chairperson)
         ->test('pages::documents.show', ['documentRecord' => $document])
-        ->call('submitForApproval')
+        ->assertForbidden();
+
+    $this->actingAs($chairperson)
+        ->get(route('documents.show', $document))
         ->assertForbidden();
 
     expect($document->refresh()->status)->toBe(DocumentStatus::Draft);
+});
+
+test('document record model submitForApproval enforces draft pdf and status invariants', function () {
+    $secretary = User::factory()->create();
+    $document = DocumentRecord::factory()->create(['created_by_id' => $secretary->id]);
+
+    expect(fn () => $document->submitForApproval($secretary))
+        ->toThrow(ValidationException::class);
 });
 
 test('captain returns pending approval document with comment', function () {
@@ -250,4 +262,62 @@ test('needs revision document can replace draft pdf and resubmit', function () {
         ->and($document->draft_pdf_original_name)->toBe('corrected.pdf');
 
     expect($captain->notifications()->count())->toBe(1);
+});
+
+test('return notification goes to the latest submitter instead of the original creator', function () {
+    Storage::fake('local');
+
+    $captain = User::factory()->captain()->create();
+    $creator = User::factory()->create();
+    $latestSubmitter = User::factory()->create();
+    $document = DocumentRecord::factory()
+        ->pendingApproval()
+        ->withDraftPdf(storeWorkflowDraftPdf())
+        ->create([
+            'created_by_id' => $creator->id,
+            'submitted_by_id' => $latestSubmitter->id,
+        ]);
+
+    $document->returnForRevision($captain, 'Please correct the latest submitted copy.');
+
+    expect($latestSubmitter->notifications()->count())->toBe(1)
+        ->and($creator->notifications()->count())->toBe(0);
+});
+
+test('approval notification goes to the latest submitter instead of the original creator', function () {
+    Storage::fake('local');
+
+    $captain = User::factory()->captain()->create();
+    $creator = User::factory()->create();
+    $latestSubmitter = User::factory()->create();
+    $document = DocumentRecord::factory()
+        ->pendingApproval()
+        ->withDraftPdf(storeWorkflowDraftPdf())
+        ->create([
+            'created_by_id' => $creator->id,
+            'submitted_by_id' => $latestSubmitter->id,
+        ]);
+
+    $document->approveForPublication($captain);
+
+    expect($latestSubmitter->notifications()->count())->toBe(1)
+        ->and($creator->notifications()->count())->toBe(0);
+});
+
+test('workflow notifications fall back to the creator for legacy records without a submitter', function () {
+    Storage::fake('local');
+
+    $captain = User::factory()->captain()->create();
+    $creator = User::factory()->create();
+    $document = DocumentRecord::factory()
+        ->pendingApproval()
+        ->withDraftPdf(storeWorkflowDraftPdf())
+        ->create([
+            'created_by_id' => $creator->id,
+            'submitted_by_id' => null,
+        ]);
+
+    $document->returnForRevision($captain, 'Legacy record correction.');
+
+    expect($creator->notifications()->count())->toBe(1);
 });

@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Enums\DocumentStatus;
 use App\Enums\ResidentStatus;
-use App\Enums\UserRole;
+use App\Enums\StaffPermission;
 use App\Models\DocumentCategory;
 use App\Models\DocumentRecord;
 use App\Models\Purok;
@@ -29,7 +29,7 @@ class ReportEngine
      */
     public function documentReport(User $user, array $filters, ?int $perPage = 25): array
     {
-        abort_unless($user->role->canManageDocuments(), 403, 'Unauthorized to view document reports.');
+        abort_unless($user->can(StaffPermission::ViewDocumentReports->value), 403, 'Unauthorized to view document reports.');
 
         $query = DocumentRecord::query()->with(['type', 'category', 'creator', 'approver']);
 
@@ -134,7 +134,7 @@ class ReportEngine
         $query = Resident::query()->with(['purok', 'household']);
 
         $purokId = null;
-        if ($user->role === UserRole::PurokChairperson) {
+        if ($user->isPurokChairperson()) {
             abort_if($user->purok_id === null, 403, 'Purok Chairperson has no assigned purok.');
             $purokId = $user->purok_id;
         } elseif (! empty($filters['purok_id'])) {

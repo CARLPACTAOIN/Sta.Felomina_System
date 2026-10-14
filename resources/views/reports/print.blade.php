@@ -336,7 +336,7 @@
                 <strong>{{ __('Date Generated:') }}</strong> {{ $generatedAt->format('F d, Y • h:i A') }}
             </div>
             <div class="meta-item">
-                <strong>{{ __('Prepared By:') }}</strong> {{ $user->name }} ({{ $user->role->label() }})
+                <strong>{{ __('Prepared By:') }}</strong> {{ $user->name }} ({{ $user->staffRoleLabel() }})
             </div>
             <div class="meta-item" style="text-align: right;">
                 <strong>{{ __('Total Records:') }}</strong> {{ $report['total_count'] }}
@@ -464,14 +464,14 @@
 
         <!-- Formal Certification / Signature Blocks -->
         @php
-            $captain = \App\Models\User::where('role', \App\Enums\UserRole::Captain)->first();
+            $captain = \App\Models\User::role(\App\Enums\UserRole::Captain->value)->first();
             $captainName = $captain ? $captain->name : 'HON. BARANGAY CAPTAIN';
         @endphp
         <footer class="signatures">
             <div class="signature-block">
                 <p class="signature-label">{{ __('Prepared and Certified Correct by:') }}</p>
                 <div class="signature-name">{{ $user->name }}</div>
-                <p class="signature-role">{{ $user->role->label() }}<br>Barangay Sta. Felomina</p>
+                <p class="signature-role">{{ $user->staffRoleLabel() }}<br>Barangay Sta. Felomina</p>
             </div>
 
             <div class="signature-block">

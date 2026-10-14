@@ -8,8 +8,15 @@
                 : __('Review the records, pending approvals, and community statistics for Barangay Sta. Felomina.')"
         >
             <x-slot:actions>
-                @if (auth()->user()->role->canManageDocuments())
-                    <flux:button variant="primary" icon="plus" :href="route('documents.create')" wire:navigate>{{ __('Create document record') }}</flux:button>
+                @if (auth()->user()->can('documents.review') || auth()->user()->can('documents.create'))
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if (auth()->user()->can('documents.review'))
+                            <flux:button variant="outline" icon="inbox-arrow-down" :href="route('approvals.index')" wire:navigate>{{ __('Review approvals') }}</flux:button>
+                        @endif
+                        @if (auth()->user()->can('documents.create'))
+                            <flux:button variant="primary" icon="plus" :href="route('documents.create')" wire:navigate>{{ __('Create document record') }}</flux:button>
+                        @endif
+                    </div>
                 @else
                     <flux:button variant="primary" icon="user-plus" :href="route('residents.index')" wire:navigate>{{ __('Open resident directory') }}</flux:button>
                 @endif

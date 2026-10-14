@@ -29,11 +29,20 @@ new #[Title('Create Document Record')] class extends Component
     public string $documentDate = '';
     public string $subject = '';
     public string $keywords = '';
+    public bool $isProjectRelated = false;
+    public string $projectName = '';
+    public string $projectLocation = '';
+    public string $approvedBudget = '';
+    public string $projectStartDate = '';
+    public string $targetCompletionDate = '';
+    public string $projectRemarks = '';
     public bool $documentNumberWasEdited = false;
-    public bool $documentCategoryWasEdited = false;
+    public bool $manualCategoryOverride = false;
 
     public function mount(): void
     {
+        $this->authorize('create', DocumentRecord::class);
+
         $this->documentDate = now()->toDateString();
     }
 
@@ -68,9 +77,9 @@ new #[Title('Create Document Record')] class extends Component
         $this->refreshSuggestedCategory();
     }
 
-    public function updatedDocumentCategoryId(): void
+    public function beginManualCategoryOverride(): void
     {
-        $this->documentCategoryWasEdited = filled($this->documentCategoryId);
+        $this->manualCategoryOverride = true;
     }
 
     public function useSuggestedDocumentNumber(): void
@@ -85,15 +94,16 @@ new #[Title('Create Document Record')] class extends Component
             return;
         }
 
-        $this->documentCategoryWasEdited = false;
+        $this->manualCategoryOverride = false;
         $this->documentCategoryId = (string) $this->suggestedDocumentCategoryId;
     }
 
     public function save(): RedirectResponse
     {
-        $user = Auth::user();
+        $this->authorize('create', DocumentRecord::class);
 
-        abort_unless($user instanceof User && $user->role->canManageDocuments(), 403);
+        /** @var User $user */
+        $user = Auth::user();
 
         $this->refreshSuggestedCategory();
 
@@ -113,11 +123,28 @@ new #[Title('Create Document Record')] class extends Component
             'documentDate' => ['required', 'date'],
             'subject' => ['required', 'string', 'max:2000'],
             'keywords' => ['nullable', 'string', 'max:1000'],
+            'isProjectRelated' => ['boolean'],
+            'projectName' => ['nullable', 'string', 'max:255'],
+            'projectLocation' => ['nullable', 'string', 'max:255'],
+            'approvedBudget' => ['nullable', 'numeric', 'min:0', 'max:999999999999.99'],
+            'projectStartDate' => ['nullable', 'date'],
+            'targetCompletionDate' => [
+                'nullable',
+                'date',
+                Rule::when(filled($this->projectStartDate), ['after_or_equal:projectStartDate']),
+            ],
+            'projectRemarks' => ['nullable', 'string', 'max:2000'],
         ], attributes: [
             'documentTypeId' => __('document type'),
             'documentCategoryId' => __('primary category'),
             'documentNumber' => __('document number'),
             'documentDate' => __('document date'),
+            'projectName' => __('project name'),
+            'projectLocation' => __('project location'),
+            'approvedBudget' => __('approved budget'),
+            'projectStartDate' => __('project start date'),
+            'targetCompletionDate' => __('target completion date'),
+            'projectRemarks' => __('project remarks'),
         ]);
 
         $documentYear = CarbonImmutable::parse($validated['documentDate'])->year;
@@ -134,6 +161,8 @@ new #[Title('Create Document Record')] class extends Component
             ]);
         }
 
+        $categoryWasOverridden = $this->categoryWasOverridden((int) $validated['documentCategoryId']);
+
         $document = DocumentRecord::create([
             'document_type_id' => (int) $validated['documentTypeId'],
             'document_category_id' => (int) $validated['documentCategoryId'],
@@ -142,8 +171,8 @@ new #[Title('Create Document Record')] class extends Component
             'category_suggestion_terms' => $this->categorySuggestionTerms === [] ? null : $this->categorySuggestionTerms,
             'category_suggestion_reason' => $this->categorySuggestionReason,
             'category_suggested_at' => $this->suggestedDocumentCategoryId === null ? null : now(),
-            'category_overridden_at' => $this->categoryWasOverridden((int) $validated['documentCategoryId']) ? now() : null,
-            'category_overridden_by_id' => $this->categoryWasOverridden((int) $validated['documentCategoryId']) ? $user->id : null,
+            'category_overridden_at' => $categoryWasOverridden ? now() : null,
+            'category_overridden_by_id' => $categoryWasOverridden ? $user->id : null,
             'created_by_id' => $user->id,
             'document_number' => $validated['documentNumber'],
             'document_year' => $documentYear,
@@ -151,6 +180,13 @@ new #[Title('Create Document Record')] class extends Component
             'document_date' => $validated['documentDate'],
             'subject' => $validated['subject'],
             'keywords' => filled($validated['keywords'] ?? null) ? $validated['keywords'] : null,
+            'is_project_related' => (bool) $validated['isProjectRelated'],
+            'project_name' => $validated['isProjectRelated'] && filled($validated['projectName'] ?? null) ? $validated['projectName'] : null,
+            'project_location' => $validated['isProjectRelated'] && filled($validated['projectLocation'] ?? null) ? $validated['projectLocation'] : null,
+            'approved_budget' => $validated['isProjectRelated'] && filled($validated['approvedBudget'] ?? null) ? $validated['approvedBudget'] : null,
+            'project_start_date' => $validated['isProjectRelated'] && filled($validated['projectStartDate'] ?? null) ? $validated['projectStartDate'] : null,
+            'target_completion_date' => $validated['isProjectRelated'] && filled($validated['targetCompletionDate'] ?? null) ? $validated['targetCompletionDate'] : null,
+            'project_remarks' => $validated['isProjectRelated'] && filled($validated['projectRemarks'] ?? null) ? $validated['projectRemarks'] : null,
         ]);
 
         if ($this->suggestedDocumentCategoryId !== null) {
@@ -162,11 +198,14 @@ new #[Title('Create Document Record')] class extends Component
             ]);
         }
 
-        if ($this->categoryWasOverridden((int) $validated['documentCategoryId'])) {
-            $document->recordAudit($user, 'document_category_overridden', 'Document category manually overridden.', [
+        if ($categoryWasOverridden) {
+            $document->recordAudit($user, 'document_category_overridden', $this->suggestedDocumentCategoryId === null
+                ? 'Document category manually assigned because no automatic rule matched.'
+                : 'Document category manually overridden.', [
                 'suggested_category_id' => $this->suggestedDocumentCategoryId,
                 'selected_category_id' => (int) $validated['documentCategoryId'],
                 'rule_id' => $this->categorySuggestionRuleId,
+                'reason' => $this->suggestedDocumentCategoryId === null ? 'no_rule_matched' : 'manual_correction',
             ]);
         }
 
@@ -223,6 +262,7 @@ new #[Title('Create Document Record')] class extends Component
 
     private function refreshSuggestedCategory(): void
     {
+        $previousSuggestedCategoryId = $this->suggestedDocumentCategoryId;
         $suggestion = (new SuggestDocumentCategory)->handle(
             documentTypeId: is_numeric($this->documentTypeId) ? (int) $this->documentTypeId : null,
             title: $this->title,
@@ -231,10 +271,19 @@ new #[Title('Create Document Record')] class extends Component
         );
 
         if ($suggestion === null) {
+            $wasAutomaticallyAssigned = ! $this->manualCategoryOverride
+                && $previousSuggestedCategoryId !== null
+                && (int) $this->documentCategoryId === $previousSuggestedCategoryId;
+
             $this->suggestedDocumentCategoryId = null;
             $this->categorySuggestionRuleId = null;
             $this->categorySuggestionTerms = [];
             $this->categorySuggestionReason = null;
+            $this->manualCategoryOverride = true;
+
+            if ($wasAutomaticallyAssigned) {
+                $this->documentCategoryId = '';
+            }
 
             return;
         }
@@ -244,15 +293,17 @@ new #[Title('Create Document Record')] class extends Component
         $this->categorySuggestionTerms = $suggestion->matchedTerms;
         $this->categorySuggestionReason = $suggestion->reason;
 
-        if (! $this->documentCategoryWasEdited || blank($this->documentCategoryId)) {
+        if (! $this->manualCategoryOverride || blank($this->documentCategoryId)) {
+            $this->manualCategoryOverride = false;
             $this->documentCategoryId = (string) $suggestion->category->id;
         }
     }
 
     private function categoryWasOverridden(int $selectedCategoryId): bool
     {
-        return $this->suggestedDocumentCategoryId !== null
-            && $this->suggestedDocumentCategoryId !== $selectedCategoryId;
+        return $this->manualCategoryOverride
+            && ($this->suggestedDocumentCategoryId === null
+                || $this->suggestedDocumentCategoryId !== $selectedCategoryId);
     }
 }; ?>
 
@@ -291,7 +342,7 @@ new #[Title('Create Document Record')] class extends Component
 
                 <flux:field class="sm:col-span-2">
                     <flux:label>{{ __('Title') }} <span class="text-red-600">*</span></flux:label>
-                    <flux:input wire:model="title" :placeholder="__('Enter the official document title')" />
+                    <flux:input wire:model.live.blur="title" :placeholder="__('Enter the official document title')" />
                     <flux:error name="title" />
                 </flux:field>
 
@@ -303,38 +354,96 @@ new #[Title('Create Document Record')] class extends Component
 
                 <flux:field>
                     <flux:label>{{ __('Primary category') }} <span class="text-red-600">*</span></flux:label>
-                    <flux:select wire:model.live="documentCategoryId">
-                        <flux:select.option value="">{{ __('Select primary category') }}</flux:select.option>
-                        @foreach ($this->documentCategories as $documentCategory)
-                            <flux:select.option :value="$documentCategory->id" wire:key="document-category-{{ $documentCategory->id }}">{{ $documentCategory->name }}</flux:select.option>
-                        @endforeach
-                    </flux:select>
-                    @if ($suggestedDocumentCategoryId !== null)
+                    @if ($suggestedDocumentCategoryId !== null && ! $manualCategoryOverride)
                         @php($suggestedCategory = $this->documentCategories->firstWhere('id', $suggestedDocumentCategoryId))
-                        @php($suggestionOverridden = $documentCategoryId !== '' && $suggestedDocumentCategoryId !== (int) $documentCategoryId)
-                        <div class="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-100">
-                            <p class="font-semibold">{{ __('Suggested: :category', ['category' => $suggestedCategory?->name ?? __('Unknown category')]) }}</p>
+                        <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-100">
+                            <p class="font-semibold">{{ __('Automatically assigned: :category', ['category' => $suggestedCategory?->name ?? __('Unknown category')]) }}</p>
                             <p class="mt-1 text-xs">{{ $categorySuggestionReason }}</p>
-                            @if ($suggestionOverridden)
-                                <flux:button class="mt-3" size="sm" variant="outline" type="button" wire:click="useSuggestedCategory">{{ __('Use suggestion') }}</flux:button>
-                            @endif
+                            <flux:button class="mt-3" size="sm" variant="outline" type="button" wire:click="beginManualCategoryOverride">{{ __('Correct category') }}</flux:button>
                         </div>
+                    @else
+                        @if ($suggestedDocumentCategoryId === null)
+                            <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                                <p class="font-semibold">{{ __('No automatic category matched') }}</p>
+                                <p class="mt-1 text-xs">{{ __('Select the most appropriate category before saving this exceptional record.') }}</p>
+                            </div>
+                        @else
+                            @php($suggestedCategory = $this->documentCategories->firstWhere('id', $suggestedDocumentCategoryId))
+                            <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                                <p class="font-semibold">{{ __('Automatic result: :category', ['category' => $suggestedCategory?->name ?? __('Unknown category')]) }}</p>
+                                <p class="mt-1 text-xs">{{ __('Choose a correction below, or return to the automatic result.') }}</p>
+                                <flux:button class="mt-3" size="sm" variant="outline" type="button" wire:click="useSuggestedCategory">{{ __('Use automatic category') }}</flux:button>
+                            </div>
+                        @endif
+
+                        <flux:select wire:model="documentCategoryId">
+                            <flux:select.option value="">{{ __('Select primary category') }}</flux:select.option>
+                            @foreach ($this->documentCategories as $documentCategory)
+                                <flux:select.option :value="$documentCategory->id" wire:key="document-category-{{ $documentCategory->id }}">{{ $documentCategory->name }}</flux:select.option>
+                            @endforeach
+                        </flux:select>
                     @endif
                     <flux:error name="documentCategoryId" />
                 </flux:field>
 
                 <flux:field class="sm:col-span-2">
                     <flux:label>{{ __('Subject or description') }} <span class="text-red-600">*</span></flux:label>
-                    <flux:textarea wire:model="subject" rows="4" :placeholder="__('Summarize the purpose and subject of this document')" />
+                    <flux:textarea wire:model.live.blur="subject" rows="4" :placeholder="__('Summarize the purpose and subject of this document')" />
                     <flux:error name="subject" />
                 </flux:field>
 
                 <flux:field class="sm:col-span-2">
                     <flux:label>{{ __('Keywords') }}</flux:label>
-                    <flux:input wire:model="keywords" :placeholder="__('Enter structured keywords separated by commas')" />
-                    <flux:description>{{ __('Used later by explainable categorization rules; PDF text is not scanned.') }}</flux:description>
+                    <flux:input wire:model.live.blur="keywords" :placeholder="__('Enter structured keywords separated by commas')" />
+                    <flux:description>{{ __('Used by automatic, explainable categorization rules; PDF text is not scanned.') }}</flux:description>
                     <flux:error name="keywords" />
                 </flux:field>
+            </div>
+        </x-panel>
+
+        <x-panel :title="__('Project metadata')" :description="__('Optional structured fields for project-related resolutions, ordinances, or certifications.')">
+            <div class="grid gap-5">
+                <flux:checkbox wire:model.live="isProjectRelated" :label="__('This document is project-related')" />
+
+                @if ($isProjectRelated)
+                    <div class="grid gap-5 sm:grid-cols-2">
+                        <flux:field>
+                            <flux:label>{{ __('Project name') }}</flux:label>
+                            <flux:input wire:model="projectName" :placeholder="__('Barangay drainage improvement')" />
+                            <flux:error name="projectName" />
+                        </flux:field>
+
+                        <flux:field>
+                            <flux:label>{{ __('Project location') }}</flux:label>
+                            <flux:input wire:model="projectLocation" :placeholder="__('Purok 3, Barangay Sta. Felomina')" />
+                            <flux:error name="projectLocation" />
+                        </flux:field>
+
+                        <flux:field>
+                            <flux:label>{{ __('Approved budget') }}</flux:label>
+                            <flux:input wire:model="approvedBudget" type="number" min="0" step="0.01" />
+                            <flux:error name="approvedBudget" />
+                        </flux:field>
+
+                        <flux:field>
+                            <flux:label>{{ __('Project start date') }}</flux:label>
+                            <flux:input wire:model="projectStartDate" type="date" />
+                            <flux:error name="projectStartDate" />
+                        </flux:field>
+
+                        <flux:field>
+                            <flux:label>{{ __('Target completion date') }}</flux:label>
+                            <flux:input wire:model="targetCompletionDate" type="date" />
+                            <flux:error name="targetCompletionDate" />
+                        </flux:field>
+
+                        <flux:field class="sm:col-span-2">
+                            <flux:label>{{ __('Project remarks') }}</flux:label>
+                            <flux:textarea wire:model="projectRemarks" rows="3" :placeholder="__('Optional project context for search and reporting')" />
+                            <flux:error name="projectRemarks" />
+                        </flux:field>
+                    </div>
+                @endif
             </div>
         </x-panel>
 

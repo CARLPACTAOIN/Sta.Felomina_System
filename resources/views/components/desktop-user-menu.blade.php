@@ -6,7 +6,7 @@
         ]) }}
         data-test="sidebar-menu-button"
     >
-        <span class="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-[#d8e8de] text-xs font-black text-[#103b2b]">
+        <span class="flex size-8.5 shrink-0 items-center justify-center rounded-full bg-[#d8e8de] text-xs font-black text-barangay-900">
             {{ auth()->user()->initials() }}
         </span>
         <span class="min-w-0 flex-1">
@@ -14,7 +14,7 @@
                 {{ auth()->user()->name }}
             </strong>
             <span class="block truncate text-[10px] text-[#adc8b8]">
-                {{ auth()->user()->role->label() }}
+                {{ auth()->user()->staffRoleLabel() }}
             </span>
         </span>
         <flux:icon.chevrons-up-down class="size-4 shrink-0 text-[#90b29f] transition group-hover:text-white" />
@@ -25,7 +25,7 @@
             <p class="truncate text-xs font-bold text-slate-900 dark:text-white">{{ auth()->user()->name }}</p>
             <p class="truncate text-[11px] text-slate-500 dark:text-slate-400">{{ auth()->user()->email }}</p>
             <span class="mt-1 inline-block rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                {{ auth()->user()->role->label() }}
+                {{ auth()->user()->staffRoleLabel() }}
             </span>
         </div>
         <flux:menu.separator />

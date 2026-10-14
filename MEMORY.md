@@ -7,7 +7,7 @@ sessions. It is not a chat transcript, progress tracker, backlog, or handoff.
 If a fact is obvious from code or belongs in the PRD, link to that source instead
 of copying it here.
 
-**Last verified:** 2026-09-12
+**Last verified:** 2026-10-15
 
 ## Product Context
 
@@ -35,8 +35,12 @@ architectural impact:
   and supersede retain a working verification URL.
 - Public access is by verification token only; V1 has no public browse/search portal.
 - Purok Chair access to resident data is enforced server-side by assigned purok.
-- Categorization is explainable, rule-based, metadata-driven, and overridable;
-  OCR and AI classification are out of scope.
+- Document preparation is Secretary-only. The Captain reviews Draft PDFs,
+  approves or returns submissions, and controls published lifecycle actions but
+  cannot create, edit, upload, download QR, submit, or resubmit documents.
+- Categorization automatically assigns from encoded metadata through explainable
+  priority rules. Secretary corrections and no-match manual assignments are
+  audited; OCR and AI classification are out of scope.
 - Categorization rules are priority-ordered persisted keyword rules with optional
   document type conditions. Document records preserve the suggested category,
   matched terms/reason, and audit-backed manual override metadata.
@@ -83,8 +87,13 @@ pipeline also checks formatting and static analysis.
 | D-003 | Coordination files have non-overlapping roles: operating contract, scope audit, durable memory, and current handoff | AI-native workflow design | 2026-09-09 |
 | D-004 | Progress is reported by evidence-backed statuses, not invented percentages | Avoids false precision and repeated re-auditing | 2026-09-09 |
 | D-005 | Root `AGENTS.md` contains only cross-cutting rules; detailed framework guidance loads through skills and path-scoped `.ai/rules` | Reduces recurring context while preserving task-specific guidance | 2026-09-09 |
-| D-006 | Staff administration keeps the existing `UserRole` enum for now; Spatie role/permission persistence remains a later PRD-alignment task requiring explicit dependency approval | User-approved staff-account slice prioritized cost-efficient momentum and no new public API/dependency | 2026-09-10 |
+| D-006 | Superseded by D-008: staff administration originally kept the existing `UserRole` enum without Spatie persistence | Earlier staff-account slice prioritized cost-efficient momentum before explicit dependency approval | 2026-09-10 |
 | D-007 | Resident and household codes are system-generated; household head is stored as a household-level name field, and normal deletion is represented by resident status changes for this slice | User-approved resident/household slice and PRD §20/§26.3 | 2026-09-10 |
+| D-008 | Staff roles and capabilities are persisted with Spatie Laravel Permission; `UserRole` remains only canonical role names/labels, while Purok isolation stays on `users.purok_id` and domain checks | User explicitly requested Spatie permissions RBAC hardening; PRD §9.4 alignment | 2026-09-22 |
+| D-009 | In-app notifications support read/unread state toggles, mark-all-read, header/sidebar unread badges, and direct deeplinks to approval workbench cards (for reviewers) or document records (for authors) | PRD §24 notification requirements | 2026-10-14 |
+| D-010 | Audit logs provide keyword search, actor/action/entity/date-range filtering, clean printable view (`audit-logs.print`) with official barangay letterhead and signatures, and UTF-8 BOM CSV export (`audit-logs.export`) for compliance and defense | PRD §25, §35.8 audit log requirements | 2026-10-14 |
+| D-011 | `DemoDataSeeder.php` provides realistic, client-ready demo data for Barangay Sta. Felomina: 32 documents across all 7 lifecycle states, standard-compliant dynamic-xref sample PDFs, full infrastructure project metadata, rule-based category suggestions/overrides, 28 households and 84 residents across all 7 puroks, 232 audit logs, and in-app notifications | PRD §36.12 representative demo data for defense and turnover | 2026-10-14 |
+| D-012 | Document preparation is Secretary-only; Captains retain review/decision, rule administration, reporting, and published lifecycle powers. Categorization automatically assigns from document type, title, subject, and keywords, with audited Secretary corrections or no-match manual assignment | Approved client workflow interpretation; PRD §7-8, §16, §34-35 | 2026-10-15 |
 
 ## Memory Maintenance
 

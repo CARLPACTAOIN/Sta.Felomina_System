@@ -1,8 +1,8 @@
 <x-layouts::app :title="__('Pending Approvals')">
     <div class="app-content">
         <x-page-header
-            :title="auth()->user()->role === \App\Enums\UserRole::Captain ? __('Pending Approvals') : __('Approval Queue')"
-            :description="auth()->user()->role === \App\Enums\UserRole::Captain ? __('Review submitted metadata and final PDFs before publication.') : __('View documents currently awaiting Captain review.')"
+            :title="auth()->user()->can('documents.review') ? __('Pending Approvals') : __('Approval Queue')"
+            :description="auth()->user()->can('documents.review') ? __('Review submitted metadata and final PDFs before publication.') : __('View documents currently awaiting Captain review.')"
         />
 
         <x-panel :title="__('Pending Approval documents')" :description="__('Records are ordered by most recent submission.')" :padding="false">

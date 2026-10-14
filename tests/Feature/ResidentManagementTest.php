@@ -80,7 +80,7 @@ test('captain creates resident with household grouping and audit event', functio
 });
 
 test('resident creation warns about likely duplicates before save and can be overridden', function () {
-    $secretary = User::factory()->create();
+    $captain = User::factory()->captain()->create();
     $purok = Purok::factory()->create();
     $household = Household::factory()->create(['purok_id' => $purok->id]);
     Resident::factory()->create([
@@ -93,7 +93,7 @@ test('resident creation warns about likely duplicates before save and can be ove
         'household_id' => $household->id,
     ]);
 
-    $component = Livewire::actingAs($secretary)
+    $component = Livewire::actingAs($captain)
         ->test('pages::residents.index')
         ->set('firstName', 'Pedro')
         ->set('middleName', 'A')
@@ -243,6 +243,44 @@ test('resident creation validates required fields', function () {
             'purokId' => ['required'],
             'householdId' => ['required'],
         ]);
+});
+
+test('secretary can view but cannot create or update residents', function () {
+    $secretary = User::factory()->create();
+    $purok = Purok::factory()->create();
+    $household = Household::factory()->create(['purok_id' => $purok->id]);
+    $resident = Resident::factory()->create([
+        'first_name' => 'Readonly',
+        'middle_name' => null,
+        'last_name' => 'Resident',
+        'purok_id' => $purok->id,
+        'household_id' => $household->id,
+    ]);
+
+    Livewire::actingAs($secretary)
+        ->test('pages::residents.index')
+        ->assertSee('Readonly Resident')
+        ->set('firstName', 'Blocked')
+        ->set('lastName', 'Resident')
+        ->set('sex', 'male')
+        ->set('birthdate', '1990-01-01')
+        ->set('civilStatus', 'single')
+        ->set('address', 'Blocked Address')
+        ->set('purokId', (string) $purok->id)
+        ->set('householdId', (string) $household->id)
+        ->set('status', ResidentStatus::Active->value)
+        ->call('createResident')
+        ->assertForbidden();
+
+    Livewire::actingAs($secretary)
+        ->test('pages::residents.index')
+        ->call('beginEdit', $resident->id)
+        ->set('editFirstName', 'Blocked Update')
+        ->call('updateResident')
+        ->assertForbidden();
+
+    expect(Resident::where('first_name', 'Blocked')->exists())->toBeFalse()
+        ->and($resident->refresh()->first_name)->toBe('Readonly');
 });
 
 test('captain cannot attach resident to household from another purok', function () {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\StaffPermission;
 use App\Models\AuditLog;
 use App\Models\CategorizationRule;
 use App\Models\DocumentCategory;
@@ -253,7 +254,7 @@ new #[Title('Categorization Rules')] class extends Component
     {
         $user = Auth::user();
 
-        abort_unless($user instanceof User && $user->role->canManageDocuments(), 403);
+        abort_unless($user instanceof User && $user->can(StaffPermission::ManageCategorizationRules->value), 403);
 
         return $user;
     }
