@@ -21,24 +21,26 @@ test('security settings page can be rendered', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)
-        ->withSession(['auth.password_confirmed_at' => time()])
         ->get(route('security.edit'));
 
     $response->assertOk();
 
-    $response->assertSee('Passkeys');
-    $response->assertSee('No passkeys yet');
-    $response->assertSee('Two-Factor Authentication');
-    $response->assertSee('Enable Two-Factor Authentication');
+    $response->assertSee('Update password');
+    $response->assertDontSee('No passkeys yet');
+    $response->assertDontSee('Add passkey');
+    $response->assertDontSee('Two-Factor Authentication');
+    $response->assertDontSee('Enable Two-Factor Authentication');
 });
 
-test('security settings page requires password confirmation when enabled', function () {
+test('security settings page is available without a password confirmation redirect', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)
         ->get(route('security.edit'));
 
-    $response->assertRedirect(route('password.confirm'));
+    $response
+        ->assertOk()
+        ->assertSee('Update password');
 });
 
 test('security settings page renders without two factor when feature is disabled', function () {
@@ -47,13 +49,12 @@ test('security settings page renders without two factor when feature is disabled
     $user = User::factory()->create();
 
     $this->actingAs($user)
-        ->withSession(['auth.password_confirmed_at' => time()])
         ->get(route('security.edit'))
         ->assertOk()
         ->assertSee('Update password')
-        ->assertDontSee('Manage your passkeys for passwordless sign-in')
-        ->assertDontSee('Add a passkey to sign in without a password')
-        ->assertDontSee('Two-factor authentication');
+        ->assertDontSee('No passkeys yet')
+        ->assertDontSee('Add passkey')
+        ->assertDontSee('Two-Factor Authentication');
 });
 
 test('two factor authentication disabled when confirmation abandoned between requests', function () {

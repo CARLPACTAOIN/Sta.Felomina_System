@@ -26,6 +26,8 @@
                         :href="route('notifications.index')"
                         :current="request()->routeIs('notifications.*')"
                         :badge="$unreadNotificationsCount > 0 ? ($unreadNotificationsCount > 99 ? '99+' : (string) $unreadNotificationsCount) : null"
+                        badge-color="red"
+                        badge:variant="solid"
                         wire:navigate
                     >
                         {{ __('Notifications') }}

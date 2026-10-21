@@ -1,3 +1,5 @@
+@props(['light' => false])
+
 @assets
 @vite('resources/js/passkeys.js')
 @endassets
@@ -66,7 +68,10 @@
     }"
 >
     <template x-if="!supported">
-        <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">{{ __('Passkeys are not supported in this browser.') }}</div>
+        <div @class([
+            'rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600',
+            'dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300' => ! $light,
+        ])>{{ __('Passkeys are not supported in this browser.') }}</div>
     </template>
 
     <template x-if="supported && !showForm">
@@ -82,7 +87,10 @@
     </template>
 
     <template x-if="supported && showForm">
-        <div class="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+        <div @class([
+            'space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4',
+            'dark:border-slate-700 dark:bg-slate-800/50' => ! $light,
+        ])>
             <flux:input
                 label="{{ __('Passkey name') }}"
                 x-model="name"
@@ -93,7 +101,7 @@
             />
             <flux:text class="!mt-1">{{ __('Give this passkey a name to help you identify it later.') }}</flux:text>
 
-            <p x-show="error" x-text="error" x-cloak class="text-sm text-red-600 dark:text-red-400"></p>
+            <p x-show="error" x-text="error" x-cloak @class(['text-sm text-red-600', 'dark:text-red-400' => ! $light])></p>
 
             <div class="flex gap-2">
                 <flux:button

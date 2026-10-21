@@ -9,6 +9,12 @@ test('login screen can be rendered', function () {
     $response->assertOk();
 });
 
+test('login screen does not offer passkey sign in', function () {
+    $response = $this->get(route('login'));
+
+    $response->assertDontSee('Sign in with a passkey');
+});
+
 test('users can authenticate using the login screen', function () {
     $user = User::factory()->create();
 

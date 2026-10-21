@@ -82,7 +82,7 @@ new #[Title('Profile settings')] class extends Component {
     <flux:heading level="2" class="sr-only">{{ __('Profile settings') }}</flux:heading>
 
     <x-pages::settings.layout :heading="__('Profile')" :subheading="__('Keep the name and email used for your staff account up to date.')">
-        <x-panel :title="__('Personal information')" :description="__('These details identify your authenticated staff account. Resident profiles are managed separately.')">
+        <x-panel light :title="__('Personal information')" :description="__('These details identify your authenticated staff account. Resident profiles are managed separately.')">
             <form wire:submit="updateProfileInformation" class="grid gap-5">
                 <flux:input wire:model="name" :label="__('Full name')" type="text" required autofocus autocomplete="name" />
 
@@ -90,7 +90,7 @@ new #[Title('Profile settings')] class extends Component {
                     <flux:input wire:model="email" :label="__('Email address')" type="email" required autocomplete="email" />
 
                     @if ($this->hasUnverifiedEmail)
-                        <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                        <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                             <p>{{ __('Your email address has not been verified.') }}</p>
                             <button type="button" class="mt-2 font-semibold underline underline-offset-4" wire:click="resendVerificationNotification" wire:loading.attr="disabled" wire:target="resendVerificationNotification">
                                 <span wire:loading.remove wire:target="resendVerificationNotification">{{ __('Send a new verification link') }}</span>
@@ -98,13 +98,13 @@ new #[Title('Profile settings')] class extends Component {
                             </button>
 
                             @if (session('status') === 'verification-link-sent')
-                                <p class="mt-2 font-medium text-emerald-700 dark:text-emerald-300">{{ __('A new verification link has been sent.') }}</p>
+                                <p class="mt-2 font-medium text-emerald-700">{{ __('A new verification link has been sent.') }}</p>
                             @endif
                         </div>
                     @endif
                 </div>
 
-                <div class="flex justify-end border-t border-slate-200 pt-5 dark:border-slate-700">
+                <div class="flex justify-end border-t border-slate-200 pt-5">
                     <flux:button variant="primary" type="submit" data-test="update-profile-button" wire:loading.attr="disabled" wire:target="updateProfileInformation">
                         <span wire:loading.remove wire:target="updateProfileInformation">{{ __('Save changes') }}</span>
                         <span wire:loading wire:target="updateProfileInformation">{{ __('Saving…') }}</span>

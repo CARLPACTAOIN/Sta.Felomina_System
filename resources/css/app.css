@@ -88,7 +88,29 @@
 }
 
 [data-flux-field]:not(ui-radio, ui-checkbox) {
-    @apply grid gap-2;
+    @apply grid min-w-0 content-start gap-2;
+    align-self: start;
+}
+
+/* Keep supporting copy in its own stable slot so it cannot move controls in
+ * neighboring grid cells when validation state changes. */
+[data-flux-field] > [data-flux-description] {
+    @apply min-w-0 text-xs leading-5;
+}
+
+[data-flux-field] > [data-flux-error] {
+    @apply mt-0! min-h-5 text-xs leading-5;
+}
+
+/* Flux hides empty errors with the `hidden` utility. Preserve the reserved
+ * slot while keeping the empty message invisible and non-disruptive. */
+[data-flux-field] > [data-flux-error].hidden {
+    display: block !important;
+    visibility: hidden;
+}
+
+[data-login-form] [data-flux-error].hidden {
+    display: none !important;
 }
 
 [data-flux-label] {
@@ -107,6 +129,28 @@ select:focus[data-flux-control] {
 
 [data-flux-control] {
     @apply rounded-xl border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900;
+}
+
+/* Account settings intentionally keeps editable content light, even when the
+ * application-wide appearance follows a dark device preference. */
+.settings-light {
+    color-scheme: light;
+}
+
+.settings-light [data-flux-control] {
+    @apply border-slate-300! bg-white! text-slate-950! placeholder:text-slate-400!;
+}
+
+.settings-light [data-flux-label] {
+    @apply text-slate-800!;
+}
+
+.settings-light [data-flux-button][data-variant='primary'] {
+    @apply bg-barangay-800! text-white! hover:bg-barangay-900!;
+}
+
+.settings-light [data-flux-button][data-variant='outline'] {
+    @apply border-slate-300! bg-white! text-slate-800! hover:bg-slate-50!;
 }
 
 @layer components {

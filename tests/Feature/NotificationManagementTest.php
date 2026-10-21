@@ -50,7 +50,9 @@ test('notifications index displays unread and read notifications with metadata a
         ->assertSee('Document approved and published.')
         ->assertSee($doc->document_number)
         ->assertSee($doc->title)
-        ->assertSee('Mark all as read');
+        ->assertSee('Mark all as read')
+        ->assertSee('data-flux-navlist-badge')
+        ->assertSee('bg-red-500');
 
     // Verify unread filter
     $unreadResponse = $this->actingAs($user)->get(route('notifications.index', ['filter' => 'unread']));

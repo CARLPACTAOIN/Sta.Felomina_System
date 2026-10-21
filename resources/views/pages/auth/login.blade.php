@@ -5,26 +5,28 @@
         <!-- Session Status -->
         <x-auth-session-status class="text-center" :status="session('status')" />
 
-        <x-passkey-verify />
-
-        <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-6">
+        <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-3" data-login-form>
             @csrf
 
             <!-- Email Address -->
-            <flux:input
-                name="email"
-                :label="__('Email address')"
-                :value="old('email')"
-                type="email"
-                required
-                autofocus
-                autocomplete="email"
-                placeholder="name@barangay.local"
-            />
+            <div class="w-full">
+                <flux:input
+                    class="w-full"
+                    name="email"
+                    :label="__('Email address')"
+                    :value="old('email')"
+                    type="email"
+                    required
+                    autofocus
+                    autocomplete="email"
+                    placeholder="name@barangay.local"
+                />
+            </div>
 
             <!-- Password -->
             <div class="relative">
                 <flux:input
+                    class="w-full"
                     name="password"
                     :label="__('Password')"
                     type="password"

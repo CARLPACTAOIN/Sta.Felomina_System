@@ -11,11 +11,7 @@ Route::middleware(['auth', 'active'])->group(function () {
 Route::middleware(['auth', 'active', 'verified'])->group(function () {
     Route::livewire('settings/appearance', 'pages::settings.appearance')->name('appearance.edit');
 
-    Route::livewire('settings/security', 'pages::settings.security')
-        ->middleware([
-            'password.confirm',
-        ])
-        ->name('security.edit');
+    Route::livewire('settings/security', 'pages::settings.security')->name('security.edit');
 });
 
 Route::get('.well-known/passkey-endpoints', function () {
