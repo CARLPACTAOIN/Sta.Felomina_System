@@ -9,8 +9,10 @@ use App\Http\Controllers\DocumentQrCodeController;
 use App\Http\Controllers\DocumentRecordController;
 use App\Http\Controllers\DocumentVerificationController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PurokResolutionFileController;
 use App\Http\Controllers\ReportPrintController;
 use App\Models\DocumentRecord;
+use App\Models\ResidentDocumentRequest;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login')->name('home');
@@ -68,6 +70,28 @@ Route::middleware(['auth', 'active', 'verified'])->group(function () {
     Route::livewire('staff-accounts', 'pages::staff-accounts.index')
         ->middleware('can:'.StaffPermission::ManageStaffAccounts->value)
         ->name('staff-accounts.index');
+    Route::livewire('puroks', 'pages::puroks.index')
+        ->middleware('can:'.StaffPermission::ManagePuroks->value)
+        ->name('puroks.index');
+    Route::get('puroks/{purok}/resolution', PurokResolutionFileController::class)
+        ->middleware('can:'.StaffPermission::ManagePuroks->value)
+        ->name('puroks.resolution.download');
+    Route::get('puroks/{purok}/resolutions/{purokResolutionFile}', PurokResolutionFileController::class)
+        ->middleware('can:'.StaffPermission::ManagePuroks->value)
+        ->name('puroks.resolution-files.download');
+    Route::livewire('resident-document-requests', 'pages::resident-document-requests.index')
+        ->middleware('can:viewAny,'.ResidentDocumentRequest::class)
+        ->name('resident-document-requests.index');
+    Route::livewire('resident-document-requests/create', 'pages::resident-document-requests.create')
+        ->middleware('can:create,'.ResidentDocumentRequest::class)
+        ->name('resident-document-requests.create');
+    Route::livewire('resident-document-requests/{residentDocumentRequest}', 'pages::resident-document-requests.show')
+        ->name('resident-document-requests.show');
+    Route::livewire('resident-document-requests/{residentDocumentRequest}/documents/create', 'pages::documents.create')
+        ->name('resident-document-requests.documents.create');
+    Route::livewire('requestable-document-types', 'pages::requestable-document-types.index')
+        ->middleware('can:'.StaffPermission::ConfigureRequestableDocumentTypes->value)
+        ->name('requestable-document-types.index');
     Route::get('audit-logs', [AuditLogController::class, 'index'])
         ->middleware('can:'.StaffPermission::ViewAuditLogs->value)
         ->name('audit-logs.index');

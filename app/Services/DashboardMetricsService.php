@@ -10,6 +10,7 @@ use App\Models\DocumentRecord;
 use App\Models\Household;
 use App\Models\Purok;
 use App\Models\Resident;
+use App\Models\ResidentDocumentRequest;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
@@ -25,6 +26,7 @@ class DashboardMetricsService
      *     published_documents: int,
      *     archived_revoked_documents: int,
      *     total_residents: int,
+     *     request_counts: array<string, int>,
      *     category_distribution: BaseCollection<int, array{name: string, count: int}>,
      *     purok_distribution: BaseCollection<int, array{name: string, count: int}>,
      *     recent_activity: Collection<int, AuditLog>,
@@ -40,6 +42,11 @@ class DashboardMetricsService
             ->count();
 
         $totalResidents = Resident::query()->count();
+        $requestCounts = ResidentDocumentRequest::query()
+            ->select('status', DB::raw('count(*) as aggregate'))
+            ->whereIn('status', ['submitted', 'needs_information', 'ready_for_payment', 'released'])
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
 
         $categoryCounts = DocumentRecord::query()
             ->select('document_category_id', DB::raw('count(*) as aggregate'))
@@ -79,6 +86,12 @@ class DashboardMetricsService
             'published_documents' => $publishedDocuments,
             'archived_revoked_documents' => $archivedRevokedDocuments,
             'total_residents' => $totalResidents,
+            'request_counts' => [
+                'submitted' => (int) ($requestCounts['submitted'] ?? 0),
+                'needs_information' => (int) ($requestCounts['needs_information'] ?? 0),
+                'ready_for_payment' => (int) ($requestCounts['ready_for_payment'] ?? 0),
+                'released' => (int) ($requestCounts['released'] ?? 0),
+            ],
             'category_distribution' => $categories,
             'purok_distribution' => $puroks,
             'recent_activity' => $recentActivity,

@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\DocumentRecord;
+use App\Models\ResidentDocumentRequest;
 use App\Policies\DocumentRecordPolicy;
+use App\Policies\ResidentDocumentRequestPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +30,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(DocumentRecord::class, DocumentRecordPolicy::class);
+        Gate::policy(ResidentDocumentRequest::class, ResidentDocumentRequestPolicy::class);
 
         Blaze::optimize()->in(resource_path('views/components'));
 

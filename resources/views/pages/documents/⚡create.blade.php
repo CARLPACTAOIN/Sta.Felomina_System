@@ -4,11 +4,14 @@ use App\Actions\Documents\SuggestDocumentCategory;
 use App\Models\DocumentCategory;
 use App\Models\DocumentRecord;
 use App\Models\DocumentType;
+use App\Models\ResidentDocumentRequest;
 use App\Models\User;
+use App\Services\ResidentDocumentRequestService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -38,12 +41,24 @@ new #[Title('Create Document Record')] class extends Component
     public string $projectRemarks = '';
     public bool $documentNumberWasEdited = false;
     public bool $manualCategoryOverride = false;
+    public ?int $residentDocumentRequestId = null;
 
-    public function mount(): void
+    public function mount(?ResidentDocumentRequest $residentDocumentRequest = null): void
     {
         $this->authorize('create', DocumentRecord::class);
 
         $this->documentDate = now()->toDateString();
+
+        if ($residentDocumentRequest instanceof ResidentDocumentRequest) {
+            abort_unless(Auth::user()?->can('process', $residentDocumentRequest), 404);
+            $residentDocumentRequest->loadMissing('documentType');
+            $this->residentDocumentRequestId = $residentDocumentRequest->id;
+            $this->documentTypeId = (string) $residentDocumentRequest->document_type_id;
+            $this->title = $residentDocumentRequest->documentType->name.' - '.$residentDocumentRequest->resident_name_snapshot;
+            $this->subject = $residentDocumentRequest->purpose;
+            $this->refreshSuggestedDocumentNumber(force: true);
+            $this->refreshSuggestedCategory();
+        }
     }
 
     public function updatedDocumentTypeId(): void
@@ -163,7 +178,8 @@ new #[Title('Create Document Record')] class extends Component
 
         $categoryWasOverridden = $this->categoryWasOverridden((int) $validated['documentCategoryId']);
 
-        $document = DocumentRecord::create([
+        $document = DB::transaction(function () use ($user, $validated, $documentYear, $categoryWasOverridden): DocumentRecord {
+            $document = DocumentRecord::create([
             'document_type_id' => (int) $validated['documentTypeId'],
             'document_category_id' => (int) $validated['documentCategoryId'],
             'suggested_document_category_id' => $this->suggestedDocumentCategoryId,
@@ -187,18 +203,18 @@ new #[Title('Create Document Record')] class extends Component
             'project_start_date' => $validated['isProjectRelated'] && filled($validated['projectStartDate'] ?? null) ? $validated['projectStartDate'] : null,
             'target_completion_date' => $validated['isProjectRelated'] && filled($validated['targetCompletionDate'] ?? null) ? $validated['targetCompletionDate'] : null,
             'project_remarks' => $validated['isProjectRelated'] && filled($validated['projectRemarks'] ?? null) ? $validated['projectRemarks'] : null,
-        ]);
+            ]);
 
-        if ($this->suggestedDocumentCategoryId !== null) {
+            if ($this->suggestedDocumentCategoryId !== null) {
             $document->recordAudit($user, 'document_category_suggested', 'Document category suggested.', [
                 'suggested_category_id' => $this->suggestedDocumentCategoryId,
                 'rule_id' => $this->categorySuggestionRuleId,
                 'matched_terms' => $this->categorySuggestionTerms,
                 'reason' => $this->categorySuggestionReason,
             ]);
-        }
+            }
 
-        if ($categoryWasOverridden) {
+            if ($categoryWasOverridden) {
             $document->recordAudit($user, 'document_category_overridden', $this->suggestedDocumentCategoryId === null
                 ? 'Document category manually assigned because no automatic rule matched.'
                 : 'Document category manually overridden.', [
@@ -207,12 +223,23 @@ new #[Title('Create Document Record')] class extends Component
                 'rule_id' => $this->categorySuggestionRuleId,
                 'reason' => $this->suggestedDocumentCategoryId === null ? 'no_rule_matched' : 'manual_correction',
             ]);
-        }
+            }
+
+            if ($this->residentDocumentRequestId !== null) {
+            $request = ResidentDocumentRequest::query()->findOrFail($this->residentDocumentRequestId);
+            abort_unless($user->can('process', $request), 404);
+            app(ResidentDocumentRequestService::class)->linkDocument($user, $request, $document);
+            }
+
+            return $document;
+        });
 
         session()->flash('status', __('Draft document record created.'));
         session()->flash('created_document_number', $document->document_number);
 
-        return redirect()->route('documents.show', $document);
+        return $this->residentDocumentRequestId === null
+            ? redirect()->route('documents.show', $document)
+            : redirect()->route('resident-document-requests.show', $this->residentDocumentRequestId);
     }
 
     /**

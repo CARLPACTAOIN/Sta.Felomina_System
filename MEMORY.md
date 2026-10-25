@@ -7,7 +7,7 @@ sessions. It is not a chat transcript, progress tracker, backlog, or handoff.
 If a fact is obvious from code or belongs in the PRD, link to that source instead
 of copying it here.
 
-**Last verified:** 2026-10-15
+**Last verified:** 2026-10-26
 
 ## Product Context
 
@@ -94,6 +94,9 @@ pipeline also checks formatting and static analysis.
 | D-010 | Audit logs provide keyword search, actor/action/entity/date-range filtering, clean printable view (`audit-logs.print`) with official barangay letterhead and signatures, and UTF-8 BOM CSV export (`audit-logs.export`) for compliance and defense | PRD §25, §35.8 audit log requirements | 2026-10-14 |
 | D-011 | `DemoDataSeeder.php` provides realistic, client-ready demo data for Barangay Sta. Felomina: 32 documents across all 7 lifecycle states, standard-compliant dynamic-xref sample PDFs, full infrastructure project metadata, rule-based category suggestions/overrides, 28 households and 84 residents across all 7 puroks, 232 audit logs, and in-app notifications | PRD §36.12 representative demo data for defense and turnover | 2026-10-14 |
 | D-012 | Document preparation is Secretary-only; Captains retain review/decision, rule administration, reporting, and published lifecycle powers. Categorization automatically assigns from document type, title, subject, and keywords, with audited Secretary corrections or no-match manual assignment | Approved client workflow interpretation; PRD §7-8, §16, §34-35 | 2026-10-15 |
+| D-013 | Purok master-data administration is Captain-only. New Puroks require a private PDF resolution attachment; replacement files are retained for audit history, while referenced Puroks are deactivated rather than deleted | User-approved Purok CRUD addendum | 2026-10-25 |
+| D-014 | Resident document requests are a lean, staff-mediated workflow: an assigned-Purok Chairperson captures an in-person request for a registered resident; any Secretary creates the linked official record, collects the captured cash fee, and releases the published document. The existing document lifecycle shows processing; V1 has no request claiming, reassignment, fee adjustments, or payment reversal | User-approved PRD addendum; PRD §6.3, §21.1, §34.6, §35.9 | 2026-10-25 |
+| D-015 | Request references use a transactionally locked per-year `REQ-YYYY-######` counter. Requests retain historical resident/household/address/Purok snapshots and a captured configured fee; an open-request guard prevents concurrent duplicate resident/type requests. Linked-document publication alone moves the request to Ready for Payment, while payment and release remain separate immutable records/events | Implemented and verified resident request workflow | 2026-10-26 |
 
 ## Memory Maintenance
 

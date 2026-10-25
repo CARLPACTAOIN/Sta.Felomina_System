@@ -4,12 +4,14 @@ namespace App\Models;
 
 use App\Enums\DocumentStatus;
 use App\Notifications\DocumentWorkflowNotification;
+use App\Services\ResidentDocumentRequestService;
 use Database\Factories\DocumentRecordFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -264,6 +266,14 @@ class DocumentRecord extends Model
     }
 
     /**
+     * @return HasOne<ResidentDocumentRequest, $this>
+     */
+    public function residentDocumentRequest(): HasOne
+    {
+        return $this->hasOne(ResidentDocumentRequest::class);
+    }
+
+    /**
      * @return MorphMany<AuditLog, $this>
      */
     public function auditLogs(): MorphMany
@@ -439,8 +449,10 @@ class DocumentRecord extends Model
             throw new RuntimeException('Unable to preserve the approved PDF version.');
         }
 
+        $linkedRequest = null;
+
         try {
-            $fileVersion = DB::transaction(function () use ($actor, $approvedAt, $versionNumber, $approvedPath): DocumentFileVersion {
+            $fileVersion = DB::transaction(function () use ($actor, $approvedAt, $versionNumber, $approvedPath, &$linkedRequest): DocumentFileVersion {
                 $this->fileVersions()->update(['is_current' => false]);
 
                 $fileVersion = $this->fileVersions()->create([
@@ -465,6 +477,11 @@ class DocumentRecord extends Model
                     'version_number' => $versionNumber,
                 ]);
 
+                $linkedRequest = $this->residentDocumentRequest()->lockForUpdate()->first();
+                if ($linkedRequest instanceof ResidentDocumentRequest) {
+                    app(ResidentDocumentRequestService::class)->markReadyForPayment($actor, $linkedRequest);
+                }
+
                 return $fileVersion;
             });
         } catch (Throwable $exception) {
@@ -474,6 +491,11 @@ class DocumentRecord extends Model
         }
 
         $this->workflowSubmitter()->notify($this->notification('Document approved and published.'));
+
+        if ($linkedRequest instanceof ResidentDocumentRequest) {
+            $linkedRequest->refresh();
+            app(ResidentDocumentRequestService::class)->notifyReadyForPayment($linkedRequest);
+        }
 
         return $fileVersion;
     }

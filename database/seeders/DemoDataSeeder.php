@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\DocumentStatus;
+use App\Enums\ResidentDocumentRequestStatus;
 use App\Enums\ResidentStatus;
 use App\Enums\UserRole;
 use App\Models\AuditLog;
@@ -14,6 +15,9 @@ use App\Models\DocumentType;
 use App\Models\Household;
 use App\Models\Purok;
 use App\Models\Resident;
+use App\Models\ResidentDocumentRequest;
+use App\Models\ResidentDocumentRequestPayment;
+use App\Models\ResidentDocumentRequestStatusHistory;
 use App\Models\User;
 use App\Notifications\DocumentWorkflowNotification;
 use Illuminate\Database\Seeder;
@@ -46,9 +50,116 @@ class DemoDataSeeder extends Seeder
             $this->seedHouseholdsAndResidents($puroks, $chairpersons);
             $this->seedOfficialDocumentsPhase1($captain, $secretary);
             $this->seedOfficialDocumentsPhase2($captain, $secretary);
+            $this->seedResidentDocumentRequests($secretary);
             $this->seedAuditLogs($captain, $secretary);
             $this->seedNotifications($captain, $secretary);
         });
+    }
+
+    /**
+     * Seed one representative resident document request for every request lifecycle state.
+     */
+    protected function seedResidentDocumentRequests(User $secretary): void
+    {
+        $residents = Resident::query()
+            ->where('status', ResidentStatus::Active)
+            ->with(['household', 'purok'])
+            ->orderBy('id')
+            ->take(6)
+            ->get()
+            ->values();
+
+        $types = DocumentType::query()
+            ->whereIn('code', ['barangay_clearance', 'certificate_of_residency', 'indigency_certificate'])
+            ->get()
+            ->keyBy('code');
+        $publishedDocuments = DocumentRecord::query()
+            ->where('status', DocumentStatus::Published)
+            ->orderBy('id')
+            ->take(2)
+            ->with('type')
+            ->get()
+            ->values();
+
+        if ($residents->count() < 6 || $types->count() < 3 || $publishedDocuments->count() < 2) {
+            return;
+        }
+
+        $fixtures = [
+            ['reference' => 'REQ-2026-000901', 'resident' => $residents[0], 'type' => $types['barangay_clearance'], 'status' => ResidentDocumentRequestStatus::Draft, 'fee' => '100.00', 'purpose' => 'Employment requirement.'],
+            ['reference' => 'REQ-2026-000902', 'resident' => $residents[1], 'type' => $types['certificate_of_residency'], 'status' => ResidentDocumentRequestStatus::Submitted, 'fee' => '50.00', 'purpose' => 'School enrollment requirement.'],
+            ['reference' => 'REQ-2026-000903', 'resident' => $residents[2], 'type' => $types['indigency_certificate'], 'status' => ResidentDocumentRequestStatus::NeedsInformation, 'fee' => '0.00', 'purpose' => 'Medical assistance application.', 'reason' => 'Please confirm the current assistance program.'],
+            ['reference' => 'REQ-2026-000904', 'resident' => $residents[3], 'type' => $publishedDocuments[0]->type, 'status' => ResidentDocumentRequestStatus::ReadyForPayment, 'fee' => '100.00', 'purpose' => 'Employment requirement.', 'document' => $publishedDocuments[0], 'receipt' => 'OR-2026-000901'],
+            ['reference' => 'REQ-2026-000905', 'resident' => $residents[4], 'type' => $publishedDocuments[1]->type, 'status' => ResidentDocumentRequestStatus::Released, 'fee' => '0.00', 'purpose' => 'Scholarship application.', 'document' => $publishedDocuments[1]],
+            ['reference' => 'REQ-2026-000906', 'resident' => $residents[5], 'type' => $types['indigency_certificate'], 'status' => ResidentDocumentRequestStatus::Cancelled, 'fee' => '0.00', 'purpose' => 'Medical assistance application.', 'reason' => 'Resident withdrew the in-person request.'],
+        ];
+
+        foreach ($fixtures as $index => $fixture) {
+            /** @var Resident $resident */
+            $resident = $fixture['resident'];
+            /** @var DocumentType $type */
+            $type = $fixture['type'];
+            $chairperson = User::query()
+                ->role(UserRole::PurokChairperson->value)
+                ->where('purok_id', $resident->purok_id)
+                ->where('is_active', true)
+                ->firstOrFail();
+            $status = $fixture['status'];
+            $createdAt = Carbon::create(2026, 10, 1)->addDays($index)->setTime(9, 0);
+            $document = $fixture['document'] ?? null;
+
+            $request = ResidentDocumentRequest::query()->updateOrCreate(
+                ['reference' => $fixture['reference']],
+                [
+                    'resident_id' => $resident->id,
+                    'document_type_id' => $type->id,
+                    'purok_id' => $resident->purok_id,
+                    'created_by_id' => $chairperson->id,
+                    'submitted_by_id' => $status === ResidentDocumentRequestStatus::Draft ? null : $chairperson->id,
+                    'document_record_id' => $document?->id,
+                    'resident_name_snapshot' => $resident->fullName(),
+                    'address_snapshot' => $resident->address,
+                    'household_code_snapshot' => $resident->household->household_code,
+                    'household_head_snapshot' => $resident->household->household_head_name,
+                    'purok_name_snapshot' => $resident->purok->name,
+                    'purpose' => $fixture['purpose'],
+                    'expected_fee' => $fixture['fee'],
+                    'status' => $status,
+                    'open_guard' => $status->isOpen() ? true : null,
+                    'latest_reason' => $fixture['reason'] ?? null,
+                    'submitted_at' => $status === ResidentDocumentRequestStatus::Draft ? null : $createdAt->copy()->addMinutes(15),
+                    'released_at' => $status === ResidentDocumentRequestStatus::Released ? $createdAt->copy()->addDay() : null,
+                    'released_by_id' => $status === ResidentDocumentRequestStatus::Released ? $secretary->id : null,
+                    'released_to_name' => $status === ResidentDocumentRequestStatus::Released ? $resident->fullName() : null,
+                    'created_at' => $createdAt,
+                    'updated_at' => $createdAt,
+                ]
+            );
+
+            ResidentDocumentRequestStatusHistory::query()->firstOrCreate(
+                ['resident_document_request_id' => $request->id, 'to_status' => ResidentDocumentRequestStatus::Draft],
+                ['from_status' => null, 'actor_id' => $chairperson->id, 'reason' => null, 'created_at' => $createdAt, 'updated_at' => $createdAt]
+            );
+
+            if ($status !== ResidentDocumentRequestStatus::Draft) {
+                ResidentDocumentRequestStatusHistory::query()->firstOrCreate(
+                    ['resident_document_request_id' => $request->id, 'to_status' => $status],
+                    ['from_status' => ResidentDocumentRequestStatus::Draft, 'actor_id' => $status === ResidentDocumentRequestStatus::Released ? $secretary->id : $chairperson->id, 'reason' => $fixture['reason'] ?? null, 'created_at' => $createdAt->copy()->addMinutes(15), 'updated_at' => $createdAt->copy()->addMinutes(15)]
+                );
+            }
+
+            if (isset($fixture['receipt'])) {
+                ResidentDocumentRequestPayment::query()->firstOrCreate(
+                    ['resident_document_request_id' => $request->id],
+                    ['receipt_reference' => $fixture['receipt'], 'amount' => $fixture['fee'], 'received_by_id' => $secretary->id, 'paid_at' => $createdAt->copy()->addDay()]
+                );
+            }
+
+            AuditLog::query()->updateOrCreate(
+                ['auditable_type' => ResidentDocumentRequest::class, 'auditable_id' => $request->id, 'action' => 'resident_document_request_created'],
+                ['actor_id' => $chairperson->id, 'summary' => 'Resident document request created.', 'context' => ['reference' => $request->reference], 'created_at' => $createdAt, 'updated_at' => $createdAt]
+            );
+        }
     }
 
     /**

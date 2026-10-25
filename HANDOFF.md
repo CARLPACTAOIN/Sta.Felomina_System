@@ -11,28 +11,26 @@ content instead of appending a chronological diary. Durable decisions belong in
 
 **Status:** Complete
 
-**Updated:** 2026-10-15
+**Updated:** 2026-10-26
 
-**Active objective:** Automatic metadata categorization and Secretary-only document preparation complete.
+**Active objective:** None.
 
 **Blockers:** None.
 
 ### Last Completed Work
 
-- Synchronized Captain permissions to review/decision/lifecycle access while removing document create, metadata edit, Draft PDF upload, QR download, and submit/resubmit capabilities. Secretary preparation access and Purok Chairperson access remain unchanged.
-- Updated dashboard, archive, and document detail surfaces so Captain review access does not expose preparation controls; direct routes and forged Livewire actions return `403`.
-- Changed creation and Draft/Needs Revision metadata editing to automatically assign the winning active category rule from document type, title, subject, and keywords, including save-time recalculation and protection against category-property tampering.
-- Added explicit Secretary correction mode, required no-match manual selection, reset-to-automatic behavior, and compatible `document_category_overridden` audit context for corrections and no-match assignments.
-- Routed return/approval notifications to the latest submitter, with creator fallback for legacy records.
-- Updated `PRD_V1.md`, `MEMORY.md`, and `PRD_PROGRESS_AUDIT.md` for the approved client workflow.
+- Implemented the complete resident document-request workflow: request configuration, Purok-scoped Chairperson intake/correction/submission, Secretary processing, linked-document creation, published-to-payment synchronization, exact-fee receipt collection, zero-fee release, separate release evidence, notifications, audits, dashboard counts, and demo data.
+- Preserved the existing Purok-management working-tree changes while sharing routing, sidebar, permissions, audit, and seeding infrastructure.
+- Updated the operator manual and PRD evidence ledger with the implemented behavior and verification evidence.
 
 ### Verification Performed
 
-- Focused document/permission/categorization/notification suite: 223 passed, 723 assertions.
-- `php artisan test --compact`: 403 passed, 2 skipped, 3,695 assertions.
-- `vendor/bin/pint --dirty --format agent`: passed (0 issues).
-- `vendor/bin/phpstan analyse --no-progress`: passed (Level 7, 0 errors).
+- `php artisan test --compact --parallel --processes=4`: passed — 425 passed, 2 skipped, 3,813 assertions.
+- Focused request/document/demo/adversarial suites: passed — 20 tests, 1,377 assertions.
+- `vendor/bin/pint --format agent <workflow files>`: passed.
+- `composer run types:check`: passed — 0 PHPStan errors.
+- `npm run build`: passed.
 
 ### Recommended Next Slice
 
-Final PRD acceptance audit (§35) across all core modules to verify readiness for release.
+No active baton. Select a new approved PRD slice when work resumes.

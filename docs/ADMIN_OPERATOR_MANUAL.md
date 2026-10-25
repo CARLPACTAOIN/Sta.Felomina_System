@@ -38,6 +38,8 @@ All authenticated staff interact with the system via standard named routes mappe
 - **Approval Queue:** `/approvals` (`route('approvals.index')`) — Executive approval workspace reserved for the Barangay Captain.
 - **Categorization Rules:** `/categorization-rules` (`route('categorization-rules.index')`) — Rule manager for automated document classification.
 - **Resident Directory:** `/residents` (`route('residents.index')`) — Demographic directory with search, filter, and duplicate detection.
+- **Document Requests:** `/resident-document-requests` (`route('resident-document-requests.index')`) — Staff-mediated intake, processing, payment, and release workspace. Purok Chairpersons see only their assigned Purok; Captains and Secretaries see the barangay-wide queue.
+- **Requestable Document Types:** `/requestable-document-types` (`route('requestable-document-types.index')`) — Captain-only control for request eligibility and standard cash fees.
 - **Household Management:** `/households` (`route('households.index')`) — Family unit registries organized by Purok.
 - **Reports & Statistics:** `/reports` (`route('reports.index')`) — Analytic summaries for demographics and legislative output.
 - **Printable Reports:** `/reports/print` (`route('reports.print')`) — Official printable letterhead format for physical distribution.
@@ -170,6 +172,42 @@ The system rigorously enforces seven lifecycle states to prevent unvetted or out
    - The system establishes a bidirectional link (`superseded_by_document_id`), records the change in `audit` logs, and displays a purple notification banner on `/verify/{token}` with a direct hyperlink to the newer enactment.
 
 ---
+
+## 5.1 Resident Document Requests, Payment, and Release
+
+Resident document requests are handled in person by staff. Residents do not have
+system accounts and cannot file requests online.
+
+1. The assigned Purok Chairperson opens **Document Requests**, selects an
+   **Active** resident from their Purok, chooses an enabled request type, records
+   the purpose and optional intake notes, then saves a Draft. The system assigns
+   an immutable `REQ-YYYY-######` reference and captures the resident, household,
+   address, and Purok details as historical evidence.
+2. The Chairperson corrects a Draft as needed and submits it to the Secretary.
+   If the Secretary needs clarification, they must enter a reason; the request is
+   returned to **Needs Information** and can be corrected and resubmitted by the
+   assigned Chairperson. Either the Secretary (before document linking) or the
+   Chairperson may cancel only an allowed in-progress request, with a reason.
+3. A Secretary creates the one linked Draft document record from the request.
+   The system pre-fills its type, resident title, purpose, year, and suggested
+   official number. Complete the existing Draft → Pending Approval → Published
+   document workflow normally; the Barangay Captain remains the only publisher.
+4. When the Captain publishes the linked document, the request automatically
+   becomes **Ready for Payment**. The Captain does not collect payment or release
+   requests. The currently assigned Purok Chairperson receives an in-app notice.
+5. A Secretary collects cash only at the captured standard fee. Positive-fee
+   requests require an unused official receipt reference and an amount exactly
+   equal to the displayed fee. Zero-fee requests do not create a payment record.
+6. A Secretary records the full name of the person receiving the document and
+   separately records release. Released requests are immutable and notify the
+   assigned Purok Chairperson. The request timeline and audit log retain the
+   responsible staff member, timestamps, reasons, and payment/release evidence.
+
+Only the Barangay Captain can configure a requestable document type or its
+standard fee. New requests stay disabled until the Captain marks the type
+requestable and confirms a non-negative fee. Changing a type or resident before
+linking deliberately recaptures the current snapshot and configured fee; it does
+not rewrite historical requests.
 
 ## 6. Public QR Code Verification Portal
 

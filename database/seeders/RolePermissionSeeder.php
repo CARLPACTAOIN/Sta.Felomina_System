@@ -41,7 +41,10 @@ class RolePermissionSeeder extends Seeder
             StaffPermission::SupersedeDocuments->value,
             StaffPermission::ManageCategorizationRules->value,
             StaffPermission::ManageStaffAccounts->value,
+            StaffPermission::ManagePuroks->value,
             StaffPermission::ViewAuditLogs->value,
+            StaffPermission::ViewResidentDocumentRequestsBarangay->value,
+            StaffPermission::ConfigureRequestableDocumentTypes->value,
             StaffPermission::ViewReports->value,
             StaffPermission::ViewDocumentReports->value,
             StaffPermission::ViewResidentReports->value,
@@ -67,6 +70,10 @@ class RolePermissionSeeder extends Seeder
             StaffPermission::ViewResidentReports->value,
             StaffPermission::ViewResidentsBarangay->value,
             StaffPermission::ViewHouseholdsBarangay->value,
+            StaffPermission::ViewResidentDocumentRequestsBarangay->value,
+            StaffPermission::ProcessResidentDocumentRequests->value,
+            StaffPermission::RecordResidentDocumentRequestPayments->value,
+            StaffPermission::ReleaseResidentDocumentRequests->value,
         ]);
 
         $purokChairperson->syncPermissions([
@@ -78,6 +85,8 @@ class RolePermissionSeeder extends Seeder
             StaffPermission::ManageResidentsAssigned->value,
             StaffPermission::ViewHouseholdsAssigned->value,
             StaffPermission::ManageHouseholdsAssigned->value,
+            StaffPermission::ViewResidentDocumentRequestsAssigned->value,
+            StaffPermission::ManageResidentDocumentRequestsAssigned->value,
         ]);
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();

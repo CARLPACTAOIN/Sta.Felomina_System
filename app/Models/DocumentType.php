@@ -17,7 +17,7 @@ use Illuminate\Support\Collection;
  * @property string|null $description
  * @property bool $is_active
  */
-#[Fillable(['name', 'code', 'number_prefix', 'description', 'is_active'])]
+#[Fillable(['name', 'code', 'number_prefix', 'description', 'is_active', 'is_requestable', 'requests_enabled', 'standard_fee'])]
 class DocumentType extends Model
 {
     /** @use HasFactory<DocumentTypeFactory> */
@@ -47,6 +47,14 @@ class DocumentType extends Model
         return $this->hasMany(CategorizationRule::class);
     }
 
+    /**
+     * @return HasMany<ResidentDocumentRequest, $this>
+     */
+    public function residentDocumentRequests(): HasMany
+    {
+        return $this->hasMany(ResidentDocumentRequest::class);
+    }
+
     public function nextDocumentNumber(int $year): string
     {
         /** @var Collection<int, string> $existingNumbers */
@@ -74,6 +82,9 @@ class DocumentType extends Model
     {
         return [
             'is_active' => 'boolean',
+            'is_requestable' => 'boolean',
+            'requests_enabled' => 'boolean',
+            'standard_fee' => 'decimal:2',
         ];
     }
 }

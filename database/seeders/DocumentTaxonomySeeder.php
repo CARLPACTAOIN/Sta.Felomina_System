@@ -36,6 +36,19 @@ class DocumentTaxonomySeeder extends Seeder
             );
         }
 
+        $requestableTypes = [
+            ['Barangay Clearance', 'barangay_clearance', 'BCLR', 'Official Barangay Clearance issued to a resident.'],
+            ['Certificate of Residency', 'certificate_of_residency', 'CRES', 'Official Certificate of Residency issued to a resident.'],
+            ['Indigency Certificate', 'indigency_certificate', 'IND', 'Official Indigency Certificate issued to a resident.'],
+        ];
+
+        foreach ($requestableTypes as [$name, $code, $prefix, $description]) {
+            DocumentType::updateOrCreate(
+                ['code' => $code],
+                ['name' => $name, 'number_prefix' => $prefix, 'description' => $description, 'is_active' => true, 'is_requestable' => true, 'requests_enabled' => false, 'standard_fee' => null]
+            );
+        }
+
         $categories = [
             ['Governance', 'governance', 'Policies, council actions, and administrative governance.'],
             ['Health', 'health', 'Health center, sanitation, medical, and public health records.'],

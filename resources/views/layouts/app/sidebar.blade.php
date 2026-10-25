@@ -54,9 +54,14 @@
                     <flux:sidebar.item icon="chart-bar-square" :href="route('reports.index')" :current="request()->routeIs('reports.*')" wire:navigate>
                         {{ $user->isPurokChairperson() ? __('Purok Summary') : __('Reports') }}
                     </flux:sidebar.item>
+                    @if ($user->can('resident-document-requests.view.barangay') || $user->can('resident-document-requests.view.assigned'))
+                        <flux:sidebar.item icon="document-text" :href="route('resident-document-requests.index')" :current="request()->routeIs('resident-document-requests.*')" wire:navigate>
+                            {{ __('Document Requests') }}
+                        </flux:sidebar.item>
+                    @endif
                 </flux:sidebar.group>
 
-                @if ($user->can('categorization-rules.manage') || $user->can('staff.manage') || $user->can('audit-logs.view'))
+                @if ($user->can('categorization-rules.manage') || $user->can('staff.manage') || $user->can('puroks.manage') || $user->can('audit-logs.view') || $user->can('resident-document-requests.configure-types'))
                     <flux:sidebar.group :heading="__('Administration')" class="mt-5 **:data-flux-sidebar-group-heading:text-emerald-200/60">
                         @if ($user->can('categorization-rules.manage'))
                             <flux:sidebar.item icon="adjustments-horizontal" :href="route('categorization-rules.index')" :current="request()->routeIs('categorization-rules.*')" wire:navigate>
@@ -64,9 +69,21 @@
                             </flux:sidebar.item>
                         @endif
 
+                        @if ($user->can('resident-document-requests.configure-types'))
+                            <flux:sidebar.item icon="currency-dollar" :href="route('requestable-document-types.index')" :current="request()->routeIs('requestable-document-types.*')" wire:navigate>
+                                {{ __('Requestable Types') }}
+                            </flux:sidebar.item>
+                        @endif
+
                         @if ($user->can('staff.manage'))
                             <flux:sidebar.item icon="user-group" :href="route('staff-accounts.index')" :current="request()->routeIs('staff-accounts.*')" wire:navigate>
                                 {{ __('Staff Accounts') }}
+                            </flux:sidebar.item>
+                        @endif
+
+                        @if ($user->can('puroks.manage'))
+                            <flux:sidebar.item icon="map-pin" :href="route('puroks.index')" :current="request()->routeIs('puroks.*')" wire:navigate>
+                                {{ __('Puroks') }}
                             </flux:sidebar.item>
                         @endif
 

@@ -34,6 +34,10 @@
                 <x-metric-card :label="__('Pending approval')" :value="$metrics['pending_approvals']" icon="inbox-arrow-down" :hint="__('Captain review queue')" />
                 <x-metric-card :label="__('Published')" :value="$metrics['published_documents']" icon="shield-check" :hint="__('Publicly verified')" />
                 <x-metric-card :label="__('Residents')" :value="$metrics['total_residents']" icon="users" :hint="__('Barangay-wide')" />
+                <x-metric-card :label="__('Submitted requests')" :value="$metrics['request_counts']['submitted']" icon="inbox-arrow-down" :hint="__('Secretary queue')" />
+                <x-metric-card :label="__('Needs information')" :value="$metrics['request_counts']['needs_information']" icon="question-mark-circle" :hint="__('Awaiting Purok correction')" />
+                <x-metric-card :label="__('Ready for payment')" :value="$metrics['request_counts']['ready_for_payment']" icon="banknotes" :hint="__('Published document available')" />
+                <x-metric-card :label="__('Released requests')" :value="$metrics['request_counts']['released']" icon="check-circle" :hint="__('Completed resident services')" />
             @endif
         </div>
 

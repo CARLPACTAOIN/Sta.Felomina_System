@@ -23,7 +23,16 @@ enum StaffPermission: string
 
     case ManageCategorizationRules = 'categorization-rules.manage';
     case ManageStaffAccounts = 'staff.manage';
+    case ManagePuroks = 'puroks.manage';
     case ViewAuditLogs = 'audit-logs.view';
+
+    case ViewResidentDocumentRequestsBarangay = 'resident-document-requests.view.barangay';
+    case ViewResidentDocumentRequestsAssigned = 'resident-document-requests.view.assigned';
+    case ManageResidentDocumentRequestsAssigned = 'resident-document-requests.manage.assigned';
+    case ProcessResidentDocumentRequests = 'resident-document-requests.process';
+    case RecordResidentDocumentRequestPayments = 'resident-document-requests.record-payment';
+    case ReleaseResidentDocumentRequests = 'resident-document-requests.release';
+    case ConfigureRequestableDocumentTypes = 'resident-document-requests.configure-types';
 
     case ViewReports = 'reports.view';
     case ViewDocumentReports = 'reports.documents.view';

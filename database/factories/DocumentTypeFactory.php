@@ -27,6 +27,14 @@ class DocumentTypeFactory extends Factory
             'number_prefix' => $prefix,
             'description' => fake()->sentence(),
             'is_active' => true,
+            'is_requestable' => false,
+            'requests_enabled' => false,
+            'standard_fee' => null,
         ];
+    }
+
+    public function requestEnabled(string $fee = '50.00'): static
+    {
+        return $this->state(fn (array $attributes): array => ['is_requestable' => true, 'requests_enabled' => true, 'standard_fee' => $fee]);
     }
 }

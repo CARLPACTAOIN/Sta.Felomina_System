@@ -145,8 +145,10 @@ class AuditLog extends Model
             'document', 'documentrecord', 'document_record', strtolower(DocumentRecord::class) => DocumentRecord::class,
             'resident', strtolower(Resident::class) => Resident::class,
             'household', strtolower(Household::class) => Household::class,
+            'purok', strtolower(Purok::class) => Purok::class,
             'staff', 'user', strtolower(User::class) => User::class,
             'rule', 'categorization_rule', 'categorizationrule', strtolower(CategorizationRule::class) => CategorizationRule::class,
+            'resident_document_request', 'residentdocumentrequest', strtolower(ResidentDocumentRequest::class) => ResidentDocumentRequest::class,
             default => class_exists($type) ? $type : null,
         };
     }
@@ -160,8 +162,10 @@ class AuditLog extends Model
             DocumentRecord::class => 'Document Records',
             Resident::class => 'Residents',
             Household::class => 'Households',
+            Purok::class => 'Puroks',
             User::class => 'Staff Accounts',
             CategorizationRule::class => 'Categorization Rules',
+            ResidentDocumentRequest::class => 'Resident Document Requests',
         ];
     }
 
@@ -184,6 +188,12 @@ class AuditLog extends Model
             'resident_status_changed' => 'Resident Status Changed',
             'household_created' => 'Household Created',
             'household_updated' => 'Household Updated',
+            'purok_created' => 'Purok Created',
+            'purok_updated' => 'Purok Updated',
+            'purok_activated' => 'Purok Activated',
+            'purok_deactivated' => 'Purok Deactivated',
+            'purok_resolution_replaced' => 'Purok Resolution Replaced',
+            'purok_deleted' => 'Purok Deleted',
             'account_created' => 'Staff Account Created',
             'account_updated' => 'Staff Account Updated',
             'account_role_changed' => 'Staff Role Changed',
@@ -194,6 +204,16 @@ class AuditLog extends Model
             'categorization_rule_updated' => 'Categorization Rule Updated',
             'categorization_rule_activated' => 'Categorization Rule Activated',
             'categorization_rule_deactivated' => 'Categorization Rule Deactivated',
+            'resident_document_request_created' => 'Resident Document Request Created',
+            'resident_document_request_corrected' => 'Resident Document Request Corrected',
+            'resident_document_request_submitted' => 'Resident Document Request Submitted',
+            'resident_document_request_information_requested' => 'Request Information Requested',
+            'resident_document_request_cancelled' => 'Resident Document Request Cancelled',
+            'resident_document_request_document_linked' => 'Request Document Linked',
+            'resident_document_request_document_published' => 'Request Document Published',
+            'resident_document_request_paid' => 'Request Payment Recorded',
+            'resident_document_request_released' => 'Request Released',
+            'requestable_document_type_configured' => 'Requestable Document Type Configured',
         ];
     }
 
@@ -234,8 +254,10 @@ class AuditLog extends Model
             DocumentRecord::class => 'Document Record',
             Resident::class => 'Resident',
             Household::class => 'Household',
+            Purok::class => 'Purok',
             User::class => 'Staff Account',
             CategorizationRule::class => 'Categorization Rule',
+            ResidentDocumentRequest::class => 'Resident Document Request',
             default => class_basename($this->auditable_type),
         };
     }
@@ -243,11 +265,11 @@ class AuditLog extends Model
     public function actionBadgeClasses(): string
     {
         return match ($this->action) {
-            'document_approved', 'account_activated', 'categorization_rule_activated' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-            'document_submitted', 'resident_created', 'household_created', 'account_created', 'categorization_rule_created' => 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border-sky-200 dark:border-sky-800',
-            'document_returned', 'resident_updated', 'household_updated', 'account_updated', 'document_category_suggested', 'document_category_overridden', 'categorization_rule_updated' => 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-            'document_revoked', 'account_deactivated', 'categorization_rule_deactivated' => 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800',
-            'document_archived', 'document_superseded', 'resident_status_changed', 'account_role_changed', 'account_password_reset' => 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+            'document_approved', 'account_activated', 'categorization_rule_activated', 'resident_document_request_released' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+            'document_submitted', 'resident_created', 'household_created', 'account_created', 'categorization_rule_created', 'resident_document_request_created', 'resident_document_request_submitted', 'resident_document_request_document_linked' => 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border-sky-200 dark:border-sky-800',
+            'document_returned', 'resident_updated', 'household_updated', 'account_updated', 'document_category_suggested', 'document_category_overridden', 'categorization_rule_updated', 'resident_document_request_corrected', 'resident_document_request_information_requested', 'requestable_document_type_configured' => 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+            'document_revoked', 'account_deactivated', 'categorization_rule_deactivated', 'resident_document_request_cancelled' => 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+            'document_archived', 'document_superseded', 'resident_status_changed', 'account_role_changed', 'account_password_reset', 'resident_document_request_document_published', 'resident_document_request_paid' => 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800',
             default => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700',
         };
     }
@@ -258,8 +280,10 @@ class AuditLog extends Model
             DocumentRecord::class => route('documents.show', $this->auditable_id),
             Resident::class => route('residents.index', ['search' => $this->auditable_id]),
             Household::class => route('households.index', ['search' => $this->auditable_id]),
+            Purok::class => route('puroks.index'),
             User::class => route('staff-accounts.index'),
             CategorizationRule::class => route('categorization-rules.index'),
+            ResidentDocumentRequest::class => route('resident-document-requests.show', $this->auditable_id),
             default => null,
         };
     }

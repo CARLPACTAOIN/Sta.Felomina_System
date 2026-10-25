@@ -5,6 +5,7 @@
 **Target Final Completion:** October 2026 (exact date to be confirmed by client)  
 **Document Status:** Authoritative Product Requirements Document (PRD)  
 **Purpose:** Product truth and long-term context for human developers and AI coding agents.
+**Approved Addendum (2026-10-25):** Staff-mediated resident document request, payment, and release workflow.
 
 ---
 
@@ -23,6 +24,7 @@ product audit.
 | Documents, files, QR, approval, or search | §10-15, §17-18, §24-26, §34.1, §34.3-34.4, §35.2-35.4 |
 | Categorization | §16, §25.1, §34.2, §35.5 |
 | Residents, households, or purok isolation | §19-21, §25.3, §26.3, §34.5, §35.6 |
+| Resident document requests | §6.3, §7-8, §19-21.1, §22, §24-26, §34.6, §35.9 |
 | Dashboards or reports | §18, §22-23, §35.7 |
 | Audit logging | §25, §33, §35.8 |
 | Backup, deployment, training, or turnover | §27-31, §36 |
@@ -100,8 +102,9 @@ The system shall:
 6. automatically assign document categories using configurable rules, with audited manual exceptions;
 7. preserve approved document history instead of silently overwriting official records;
 8. allow Purok Chairpersons to maintain resident records for their assigned purok;
-9. provide simple operational dashboards and reports;
-10. provide accountability through automatic audit logs.
+9. support staff-mediated resident document requests from Purok intake through payment and release;
+10. provide simple operational dashboards and reports;
+11. provide accountability through automatic audit logs.
 
 ## 4.2 Secondary Goals
 
@@ -159,6 +162,19 @@ Resident profiling is part of the required system.
 
 Purok Chairpersons manage residents belonging to their assigned purok. Barangay-wide authorized users may view residents across all puroks according to role permissions.
 
+## 6.3 Staff-Mediated Resident Document Requests
+
+Residents do not create accounts or submit requests online. A resident gives the
+required information in person to the Chairperson of the resident's assigned
+Purok. The Chairperson creates and submits a service-intake request to the
+Secretary through the system.
+
+The request is not an official document record. Only the Secretary may create
+the linked official document record and the existing Secretary-to-Captain
+approval workflow remains authoritative. After the linked document is Published,
+the resident goes to the Secretary to pay the configured fee, when applicable,
+and receive the document.
+
 ---
 
 # 7. User Roles
@@ -184,6 +200,8 @@ The Captain may:
 - activate/deactivate staff accounts;
 - reset staff passwords;
 - manage categorization rules;
+- configure requestable document types and their standard fees;
+- view all resident document requests;
 - view all resident records;
 - view reports;
 - view audit logs;
@@ -214,7 +232,9 @@ The Secretary may:
 - correct automatically assigned categories or select a category when no rule matches;
 - view residents across the barangay;
 - view reports;
-- view relevant audit history.
+- view relevant audit history;
+- receive and process resident document requests across all Puroks;
+- request missing information before official document creation, create the linked official document record, record payment, and record release.
 
 The Secretary may **not** self-approve documents.
 
@@ -231,7 +251,9 @@ The Purok Chairperson may:
 - update household information for the assigned purok;
 - search residents in the assigned purok;
 - change resident status where allowed;
-- view simple purok-level resident summaries.
+- view simple purok-level resident summaries;
+- create, edit, submit, resubmit, and cancel eligible resident document requests for residents in the assigned Purok;
+- receive in-app status updates for assigned-Purok requests.
 
 The Purok Chairperson may **not**:
 
@@ -285,6 +307,10 @@ There is no public searchable document portal in Capstone V1.
 | Manage categorization rules | Yes | Yes | No | No | No |
 | Correct automatically assigned category | No | Yes | No | No | No |
 | Manage staff accounts | Yes | No | No | No | No |
+| Configure requestable document types and standard fees | Yes | No | No | No | No |
+| Create/manage assigned-Purok document requests | No | No | Yes | No | No |
+| Process resident document requests and record payment/release | No | Yes | No | No | No |
+| View resident document requests | Yes | Yes | Assigned Purok only | No | No |
 | View all residents | Yes | Yes | No | No | No |
 | Manage residents in assigned purok | Optional | Optional | Yes | No | No |
 | View reports | Yes | Yes | Purok-limited | No | No |
@@ -958,6 +984,80 @@ The system shall enforce server-side authorization so that a Purok Chairperson:
 
 UI hiding alone is not sufficient. Authorization must be enforced in backend policies/logic.
 
+## 21.1 Purok-Scoped Resident Document Requests
+
+### 21.1.1 Requestable document configuration
+
+The Captain alone configures whether a document type is requestable, its
+non-negative standard fee, and whether it is active for new requests. Initial
+requestable types are Barangay Clearance, Certificate of Residency, and
+Indigency Certificate; additional certificate types may be configured later.
+
+Each requestable type is a distinct document type with its own code and
+numbering prefix. A type must remain inactive for new requests until the
+Captain has confirmed its standard fee. The PRD deliberately does not invent
+local fee amounts.
+
+### 21.1.2 Request intake and Purok isolation
+
+Each request has an immutable human-readable reference number distinct from the
+official document number. The Chairperson may create a request only for an
+existing resident in the Chairperson's currently assigned Purok. The request
+must capture:
+
+- requested document type;
+- required purpose;
+- optional intake notes;
+- snapshot of the resident's name, address, household, and Purok;
+- configured expected fee at the time of request; and
+- the Chairperson, submission, and status history.
+
+No supporting-file upload is included in this workflow. Supporting evidence is
+collected and checked in person.
+
+Access follows the request's Purok, not the original Chairperson. A Chairperson
+who is reassigned or loses the role must no longer access requests from the
+former Purok, even if that Chairperson created them.
+
+### 21.1.3 Request lifecycle
+
+The request states are: Draft, Submitted, Needs Information, Ready for Payment,
+Released, and Cancelled. The linked official document's existing lifecycle
+shows its preparation and approval progress; the request does not duplicate
+those document states.
+
+1. The Chairperson may edit a Draft and submit it to the Secretary.
+2. All active Secretaries see Submitted requests in a shared queue; any
+   Secretary may process one without a separate claim or ownership step.
+3. Before an official document record exists, the Secretary may move a request
+   to Needs Information or cancel it, with a required reason. The Chairperson
+   may correct and resubmit a Needs Information request, and may cancel a Draft,
+   Submitted, or Needs Information request with a required reason.
+4. The Secretary creates exactly one linked official Document Record. From that
+   point the request cannot be cancelled; correction, archive, revoke, and
+   supersede behavior belongs to the linked document lifecycle.
+5. When the linked record becomes Published, the request becomes Ready for
+   Payment.
+6. Duplicate open requests for the same resident and document type are blocked.
+   A new request is allowed only after the earlier request is Cancelled or
+   Released.
+
+### 21.1.4 Payment and release
+
+Only the Secretary may record payment and release. Capstone V1 supports cash
+payments only. The request uses the configured fee captured at intake; V1 has
+no per-request fee adjustment. A positive payment requires a globally unique
+official receipt/reference number, collected amount, receiving Secretary, and
+paid-at timestamp. Zero-fee requests skip payment and may proceed from Ready
+for Payment directly to Released.
+
+Payment and release are separate actions. Release records the released-at time
+and the receiving person's full name.
+
+Recorded payment and release details are immutable in V1. Corrections to a
+payment are handled through the Barangay's manual financial process until a
+dedicated finance module is approved.
+
 ---
 
 # 22. Dashboard
@@ -976,7 +1076,8 @@ Show useful summaries such as:
 - published documents;
 - archived/revoked documents;
 - total residents;
-- residents by purok.
+- residents by purok;
+- counts of Submitted, Needs Information, Ready for Payment, and Released resident document requests.
 
 Simple charts/cards are sufficient.
 
@@ -987,7 +1088,8 @@ Show only purok-relevant information such as:
 - total residents;
 - active residents;
 - households;
-- recent resident updates.
+- recent resident updates;
+- assigned-Purok resident document request status updates.
 
 Avoid unnecessary analytics complexity.
 
@@ -1038,7 +1140,12 @@ Captain:
 
 Secretary:
 - document approved;
-- document returned for revision.
+- document returned for revision;
+- resident document request submitted.
+
+Purok Chairperson:
+- resident document request needs information;
+- resident document request cancelled, ready for payment, or released.
 
 Return and approval notifications target the latest submitting Secretary. Legacy
 records without a submitter fall back to the original creator.
@@ -1088,7 +1195,13 @@ At minimum, log high-level changes such as:
 - resident updated;
 - resident status changed.
 
-## 25.4 Audit Fields
+## 25.4 Resident Document Request Events
+
+At minimum, log request creation, submission, information request, correction,
+cancellation, linked document creation, linked document publication, payment,
+and release.
+
+## 25.5 Audit Fields
 
 Each audit record should include:
 
@@ -1122,6 +1235,11 @@ Allowed lifecycle actions:
 ## 26.3 Resident Records
 
 Prefer status changes to permanent deletion.
+
+## 26.4 Resident Document Requests
+
+Resident document requests and their payment/release evidence are not normally
+deleted. Use the defined terminal statuses and automatic audit trail instead.
 
 ---
 
@@ -1272,6 +1390,8 @@ The exact database design may vary, but the domain should conceptually support:
 - Purok
 - Household
 - Resident
+- ResidentDocumentRequest
+- ResidentDocumentRequestPayment
 - Document
 - DocumentType
 - DocumentVersion
@@ -1317,6 +1437,12 @@ These rules are mandatory.
 18. SMS/email notifications are out of scope.
 19. Full document authoring is out of scope.
 20. Audit events are generated automatically.
+21. Residents have no service-request account; requests are entered in person by the assigned Purok Chairperson.
+22. A Purok Chairperson may create or view requests only for the Chairperson's currently assigned Purok.
+23. A request is not an official Document Record, and only the Secretary can create the single linked official document.
+24. A request becomes Ready for Payment only after its linked Document Record is Published.
+25. Payment and release records are separate, auditable actions; positive cash payments require a unique receipt/reference number.
+26. Released requests and their payment/release evidence are immutable in V1.
 
 ---
 
@@ -1394,6 +1520,17 @@ These rules are mandatory.
 7. User updates resident over time.
 8. User changes status instead of deleting when appropriate.
 
+## 34.6 Resident Document Request, Payment, and Release
+
+1. Resident visits the Chairperson of the resident's assigned Purok and provides request information in person.
+2. Chairperson selects the registered resident, enters document type, purpose, and optional notes, and saves or submits the request.
+3. System snapshots resident details, assigns the request reference, blocks an open duplicate, and notifies active Secretaries after submission.
+4. Any Secretary in the shared queue verifies the request and either requests information or cancels it with a reason.
+5. Secretary creates the one linked official Document Record and completes the existing Draft-to-Published workflow with the Captain.
+6. System marks the request Ready for Payment when that linked record is Published and notifies the assigned-Purok Chairperson.
+7. Resident visits the Secretary; the Secretary records cash payment and receipt/reference, unless the request has a zero fee.
+8. Secretary releases the official document and records recipient details. The system marks the request Released and notifies the assigned-Purok Chairperson.
+
 ---
 
 # 35. Acceptance Criteria by Module
@@ -1464,6 +1601,19 @@ These rules are mandatory.
 - Actor and timestamp are retained.
 - Normal users cannot casually alter audit history.
 
+## 35.9 Resident Document Requests
+
+- A Purok Chairperson can create, submit, correct, and cancel eligible requests only for residents in the assigned Purok.
+- A Chairperson cannot access requests from another Purok, including requests personally created before reassignment.
+- Requests require an existing resident, requestable active document type, purpose, resident snapshot, and immutable request reference.
+- An open duplicate for the same resident and document type is blocked.
+- Secretaries receive submitted requests in a shared queue and may perform only their authorized status transitions.
+- Only the Secretary can create the single linked official document record; the existing Captain approval flow remains enforced.
+- A request becomes Ready for Payment only after the linked official document is Published.
+- Positive cash payments require a unique receipt/reference; payment and release are audited.
+- Recorded payment and release details are immutable in V1.
+- Request status notifications reach the appropriate Secretaries and assigned-Purok Chairperson without creating resident accounts, SMS, or email.
+
 ---
 
 # 36. Definition of Done — Capstone V1
@@ -1486,6 +1636,7 @@ The system is considered complete for the capstone when:
 14. basic user/admin documentation exists;
 15. backup/restore procedure is documented;
 16. critical defects discovered before final defense are resolved.
+17. resident document requests, payment, and release work end-to-end with Purok isolation and the existing document approval workflow.
 
 The following do **not** prevent Capstone V1 completion unless separately added to scope:
 
