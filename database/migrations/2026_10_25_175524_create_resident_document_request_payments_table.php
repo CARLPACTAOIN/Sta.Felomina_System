@@ -13,7 +13,15 @@ return new class extends Migration
     {
         Schema::create('resident_document_request_payments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('resident_document_request_id')->unique()->constrained()->restrictOnDelete();
+            $table->foreignId('resident_document_request_id');
+            $table->foreign(
+                'resident_document_request_id',
+                'resident_document_request_payments_request_fk',
+            )->references('id')->on('resident_document_requests')->restrictOnDelete();
+            $table->unique(
+                'resident_document_request_id',
+                'resident_document_request_payments_request_unique',
+            );
             $table->string('receipt_reference', 100)->unique();
             $table->decimal('amount', 12, 2);
             $table->foreignId('received_by_id')->constrained('users')->restrictOnDelete();

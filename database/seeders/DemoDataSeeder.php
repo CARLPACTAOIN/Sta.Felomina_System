@@ -293,6 +293,12 @@ class DemoDataSeeder extends Seeder
                     'middle_name' => $rData['middle_name'],
                     'last_name' => $rData['last_name'],
                     'suffix' => $rData['suffix'],
+                    'normalized_full_name' => Resident::normalizeFullName(
+                        $rData['first_name'],
+                        $rData['middle_name'],
+                        $rData['last_name'],
+                        $rData['suffix'],
+                    ),
                     'sex' => $rData['sex'],
                     'birthdate' => $rData['birthdate'],
                     'civil_status' => $rData['civil_status'],
