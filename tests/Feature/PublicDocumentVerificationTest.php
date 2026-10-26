@@ -22,6 +22,7 @@ test('public verification route shows draft records as not yet verified without 
         ->assertSee('RES-2026-014')
         ->assertSee('Resolution')
         ->assertSee('Rehabilitation of Barangay Health Center')
+        ->assertSee('wrap-anywhere font-mono text-xs leading-5', false)
         ->assertDontSee('Download PDF');
 });
 

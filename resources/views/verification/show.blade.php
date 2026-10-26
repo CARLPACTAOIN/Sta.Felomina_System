@@ -50,9 +50,12 @@
 
                     <dl class="grid gap-x-8 gap-y-5 sm:grid-cols-2">
                         @foreach ([['Document number', $document->document_number], ['Current status', $status->label()], ['Document type', $document->type->name], ['Title', $document->title], ['Primary category', $document->category->name], ['Issuing barangay', 'Barangay Sta. Felomina'], ['Verification reference', $document->verification_token], ['Approved date', $hasApprovedMetadata ? $document->approved_at?->toFormattedDateString() : __('Not approved')], ['Approved by', $hasApprovedMetadata ? ($document->approver?->name ?? __('Barangay Captain')) : __('Not approved')]] as [$label, $value])
-                            <div class="border-b border-slate-100 pb-4 dark:border-slate-800" wire:key="verification-field-{{ str($label)->slug() }}">
+                            <div class="min-w-0 border-b border-slate-100 pb-4 dark:border-slate-800" wire:key="verification-field-{{ str($label)->slug() }}">
                                 <dt class="text-xs font-bold uppercase tracking-wider text-slate-400">{{ $label }}</dt>
-                                <dd class="mt-1.5 text-sm font-semibold text-slate-900 dark:text-white">{{ $value }}</dd>
+                                <dd @class([
+                                    'mt-1.5 text-sm font-semibold text-slate-900 dark:text-white',
+                                    'wrap-anywhere font-mono text-xs leading-5' => $label === 'Verification reference',
+                                ])>{{ $value }}</dd>
                             </div>
                         @endforeach
                         @if ($document->is_project_related && filled($document->project_name))
