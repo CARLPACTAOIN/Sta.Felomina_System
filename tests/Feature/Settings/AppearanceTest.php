@@ -11,5 +11,7 @@ test('appearance settings render all supported preferences', function () {
         ->assertSee('Display theme')
         ->assertSee('Light')
         ->assertSee('Dark')
-        ->assertSee('System');
+        ->assertSee('System')
+        ->assertSee("window.localStorage.setItem('flux.appearance', 'light');", false)
+        ->assertSee("window.localStorage.setItem('flux.appearance.system-selected', 'true');", false);
 });

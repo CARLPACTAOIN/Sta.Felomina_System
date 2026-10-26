@@ -12,4 +12,12 @@
 @fonts
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
+<script>
+    if (
+        ! window.localStorage.getItem('flux.appearance') &&
+        ! window.localStorage.getItem('flux.appearance.system-selected')
+    ) {
+        window.localStorage.setItem('flux.appearance', 'light');
+    }
+</script>
 @fluxAppearance
