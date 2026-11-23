@@ -743,6 +743,7 @@ The system does not require OCR or full scanned-PDF text extraction.
 Each document has:
 
 - exactly one **Primary Category**;
+- zero or more manually selected **Additional Categories**;
 - zero or more optional **Tags**.
 
 Example:
@@ -754,7 +755,7 @@ Tags:
 - Budget
 - Health Facility
 
-This preserves clean reporting while allowing multi-topic documents.
+The Secretary may select additional active categories when creating or editing Draft and Needs Revision documents. Existing assignments remain visible if a category is later deactivated. Automatic rules continue to select only the primary category. Category filters and counts include all assigned categories, so category counts may overlap; document totals remain distinct.
 
 ## 16.4 Suggested Default Categories
 
@@ -1652,6 +1653,14 @@ The following do **not** prevent Capstone V1 completion unless separately added 
 ---
 
 # 37. Change Control
+
+## Approved public library addendum
+
+The public landing page may show a searchable library of published documents explicitly listed by the Captain. Resident-request documents are excluded. Records are unlisted by default. Only currently Published records with an approved PDF appear in the library. The Captain may remove a listing, and listing changes are audited. Existing QR verification and PDF access rules continue to apply. This addendum supersedes the QR-only public browsing restrictions elsewhere in this PRD.
+
+## Approved public library addendum
+
+The public landing page may show a searchable library of published documents explicitly listed by the Captain. Resident-request documents are excluded. Records are unlisted by default. Only currently Published records with an approved PDF appear in the library. The Captain may remove a listing, and listing changes are audited. Existing QR verification and PDF access rules continue to apply. This addendum supersedes the QR-only public browsing restrictions elsewhere in this PRD.
 
 Because capstone requirements may still change before final defense, all significant new requests should be classified as one of:
 

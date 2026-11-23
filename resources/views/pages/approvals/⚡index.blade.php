@@ -152,7 +152,7 @@ new #[Title('Pending Approvals')] class extends Component
     public function documents(): LengthAwarePaginator
     {
         $query = $this->baseQuery()
-            ->with(['type', 'category', 'creator', 'submitter', 'draftPdfUploader']);
+            ->with(['type', 'category', 'secondaryCategories', 'creator', 'submitter', 'draftPdfUploader']);
 
         $search = trim($this->search);
         if ($search !== '') {
@@ -170,7 +170,7 @@ new #[Title('Pending Approvals')] class extends Component
         }
 
         if (filled($this->categoryId)) {
-            $query->where('document_category_id', (int) $this->categoryId);
+            $query->inCategory((int) $this->categoryId);
         }
 
         match ($this->sort) {
@@ -303,7 +303,7 @@ new #[Title('Pending Approvals')] class extends Component
                             <div class="flex flex-wrap items-center gap-2">
                                 <x-status-badge :status="$document->status" />
                                 <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ $document->type->name }}</span>
-                                <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">{{ $document->category->name }}</span>
+                                <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">{{ $document->categoryNames() }}</span>
                                 @if ($document->return_comment)
                                     <span class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-800 dark:bg-red-950/50 dark:text-red-300">{{ __('Returned before') }}</span>
                                 @endif

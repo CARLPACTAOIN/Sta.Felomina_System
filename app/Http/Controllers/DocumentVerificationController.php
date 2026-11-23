@@ -12,7 +12,7 @@ class DocumentVerificationController extends Controller
         $document = DocumentRecord::query()
             ->with([
                 'type',
-                'category',
+                'category', 'secondaryCategories',
                 'approver',
                 'archiver',
                 'revoker',

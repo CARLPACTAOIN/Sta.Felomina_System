@@ -3,11 +3,17 @@
 namespace App\Policies;
 
 use App\Enums\StaffPermission;
+use App\Enums\UserRole;
 use App\Models\DocumentRecord;
 use App\Models\User;
 
 class DocumentRecordPolicy
 {
+    public function managePublicListing(User $user, DocumentRecord $documentRecord): bool
+    {
+        return $user->hasRole(UserRole::Captain->value);
+    }
+
     public function viewAny(User $user): bool
     {
         return $user->can(StaffPermission::ViewDocuments->value);

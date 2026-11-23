@@ -11,25 +11,25 @@ content instead of appending a chronological diary. Durable decisions belong in
 
 **Status:** Complete
 
-**Updated:** 2026-10-26
+**Updated:** 2026-11-23
 
-**Active objective:** None.
+**Active objective:** Complete visual and role-based verification of the public landing page and curated library.
 
-**Blockers:** None.
+**Blockers:** Browser-based responsive and keyboard checks remain outstanding.
 
 ### Last Completed Work
 
-- Implemented the complete resident document-request workflow: request configuration, Purok-scoped Chairperson intake/correction/submission, Secretary processing, linked-document creation, published-to-payment synchronization, exact-fee receipt collection, zero-fee release, separate release evidence, notifications, audits, dashboard counts, and demo data.
-- Preserved the existing Purok-management working-tree changes while sharing routing, sidebar, permissions, audit, and seeding infrastructure.
-- Updated the operator manual and PRD evidence ledger with the implemented behavior and verification evidence.
+- Added the public landing page, searchable curated document library, Captain listing controls, and a PRD addendum. Applied the public-library migration locally.
+- Public library and existing verification tests passed, along with Pint, PHPStan, and the asset build. Browser-based visual checks and comprehensive resident-request exclusion and lifecycle action tests remain to be completed.
+
+- Added manually selected additional document categories while retaining the existing automatic primary-category workflow. Category search, approval filtering, verification, reports, printing, and dashboard counts include additional assignments.
+- Applied the additional-category migration to the local database. Existing primary assignments remain unchanged.
 
 ### Verification Performed
 
-- `php artisan test --compact --parallel --processes=4`: passed — 425 passed, 2 skipped, 3,813 assertions.
-- Focused request/document/demo/adversarial suites: passed — 20 tests, 1,377 assertions.
-- `vendor/bin/pint --format agent <workflow files>`: passed.
-- `composer run types:check`: passed — 0 PHPStan errors.
-- `npm run build`: passed.
+- Focused additional-category and suggestion tests: 11 passed, 76 assertions.
+- Related document, archive, dashboard, approval, report, and verification suites: 62 passed; one Blade compilation collision from concurrent Windows test runs passed on a sequential rerun.
+- `composer run types:check`: passed; `vendor/bin/pint --dirty --format agent`: passed; `npm run build`: passed.
 
 ### Recommended Next Slice
 

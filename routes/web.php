@@ -9,13 +9,14 @@ use App\Http\Controllers\DocumentQrCodeController;
 use App\Http\Controllers\DocumentRecordController;
 use App\Http\Controllers\DocumentVerificationController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PublicLibraryController;
 use App\Http\Controllers\PurokResolutionFileController;
 use App\Http\Controllers\ReportPrintController;
 use App\Models\DocumentRecord;
 use App\Models\ResidentDocumentRequest;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/login')->name('home');
+Route::get('/', PublicLibraryController::class)->name('home');
 
 Route::get('verify/{token}', DocumentVerificationController::class)
     ->where('token', '[A-Za-z0-9]+')

@@ -482,7 +482,7 @@ new #[Title('Reports')] class extends Component
                                         <p class="mt-0.5 line-clamp-1 text-xs text-slate-500 dark:text-slate-400">{{ $doc->subject }}</p>
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5">{{ $doc->type->name }}</td>
-                                    <td class="whitespace-nowrap px-5 py-3.5">{{ $doc->category->name }}</td>
+                                    <td class="whitespace-nowrap px-5 py-3.5">{{ $doc->categoryNames() }}</td>
                                     <td class="whitespace-nowrap px-5 py-3.5">{{ $doc->document_date->format('M d, Y') }}</td>
                                     <td class="whitespace-nowrap px-5 py-3.5">
                                         <x-status-badge :status="$doc->status" />

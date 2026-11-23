@@ -37,7 +37,7 @@ class DocumentRecordController extends Controller
             ->all();
 
         $documents = DocumentRecord::query()
-            ->with(['type', 'category', 'creator'])
+            ->with(['type', 'category', 'secondaryCategories', 'creator'])
             ->when($filters['q'] !== '', function (Builder $query) use ($filters): void {
                 $search = mb_strtolower((string) $filters['q']);
 
@@ -54,11 +54,12 @@ class DocumentRecordController extends Controller
                                 ->whereRaw('LOWER(name) LIKE ?', ['%'.$search.'%'])
                                 ->orWhereRaw('LOWER(code) LIKE ?', ['%'.$search.'%']);
                         })
-                        ->orWhereHas('category', fn (Builder $query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.$search.'%']));
+                        ->orWhereHas('category', fn (Builder $query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.$search.'%']))
+                        ->orWhereHas('secondaryCategories', fn (Builder $query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.$search.'%']));
                 });
             })
             ->when($filters['type'] !== '', fn (Builder $query) => $query->where('document_type_id', (int) $filters['type']))
-            ->when($filters['category'] !== '', fn (Builder $query) => $query->where('document_category_id', (int) $filters['category']))
+            ->when($filters['category'] !== '', fn (Builder $query) => $query->inCategory((int) $filters['category']))
             ->when($filters['status'] !== '', fn (Builder $query) => $query->where('status', $filters['status']))
             ->when($filters['year'] !== '', fn (Builder $query) => $query->where('document_year', (int) $filters['year']));
 

@@ -10,6 +10,7 @@ use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -34,6 +35,8 @@ new #[Title('Document Record')] class extends Component
     public bool $editingMetadata = false;
     public string $metadataDocumentTypeId = '';
     public string $metadataDocumentCategoryId = '';
+    /** @var array<int, string> */
+    public array $metadataSecondaryCategoryIds = [];
     public ?int $metadataSuggestedDocumentCategoryId = null;
     public ?int $metadataCategorySuggestionRuleId = null;
     /** @var array<int, string> */
@@ -70,6 +73,7 @@ new #[Title('Document Record')] class extends Component
         $this->editingMetadata = true;
         $this->metadataDocumentTypeId = (string) $this->documentRecord->document_type_id;
         $this->metadataDocumentCategoryId = (string) $this->documentRecord->document_category_id;
+        $this->metadataSecondaryCategoryIds = $this->documentRecord->secondaryCategories->map(fn (DocumentCategory $category): string => (string) $category->id)->all();
         $this->metadataDocumentNumber = $this->documentRecord->document_number;
         $this->metadataTitle = $this->documentRecord->title;
         $this->metadataDocumentDate = $this->documentRecord->document_date->toDateString();
@@ -181,6 +185,8 @@ new #[Title('Document Record')] class extends Component
                 'integer',
                 Rule::exists('document_categories', 'id')->where('is_active', true),
             ],
+            'metadataSecondaryCategoryIds' => ['array'],
+            'metadataSecondaryCategoryIds.*' => ['integer', 'distinct', Rule::exists('document_categories', 'id')->where(fn ($query) => $query->where('is_active', true)->orWhereIn('id', $this->documentRecord->secondaryCategories()->pluck('document_categories.id')->all()))],
             'metadataDocumentNumber' => ['required', 'string', 'max:64'],
             'metadataTitle' => ['required', 'string', 'max:255'],
             'metadataDocumentDate' => ['required', 'date'],
@@ -239,52 +245,61 @@ new #[Title('Document Record')] class extends Component
         $categoryWasOverridden = $this->metadataCategoryWasOverridden((int) $validated['metadataDocumentCategoryId']);
         $isProjectRelated = (bool) $validated['metadataIsProjectRelated'];
 
-        $this->documentRecord->updateMetadata($user, [
-            'document_type_id' => (int) $validated['metadataDocumentTypeId'],
-            'document_category_id' => (int) $validated['metadataDocumentCategoryId'],
-            'suggested_document_category_id' => $this->metadataSuggestedDocumentCategoryId,
-            'category_suggestion_rule_id' => $this->metadataCategorySuggestionRuleId,
-            'category_suggestion_terms' => $this->metadataCategorySuggestionTerms === [] ? null : $this->metadataCategorySuggestionTerms,
-            'category_suggestion_reason' => $this->metadataCategorySuggestionReason,
-            'category_suggested_at' => $this->metadataSuggestedDocumentCategoryId === null ? null : now(),
-            'category_overridden_at' => $categoryWasOverridden ? now() : null,
-            'category_overridden_by_id' => $categoryWasOverridden ? $user->id : null,
-            'document_number' => $validated['metadataDocumentNumber'],
-            'document_year' => $documentYear,
-            'title' => $validated['metadataTitle'],
-            'document_date' => $validated['metadataDocumentDate'],
-            'subject' => $validated['metadataSubject'],
-            'keywords' => filled($validated['metadataKeywords'] ?? null) ? $validated['metadataKeywords'] : null,
-            'is_project_related' => $isProjectRelated,
-            'project_name' => $isProjectRelated && filled($validated['metadataProjectName'] ?? null) ? $validated['metadataProjectName'] : null,
-            'project_location' => $isProjectRelated && filled($validated['metadataProjectLocation'] ?? null) ? $validated['metadataProjectLocation'] : null,
-            'approved_budget' => $isProjectRelated && filled($validated['metadataApprovedBudget'] ?? null) ? $validated['metadataApprovedBudget'] : null,
-            'project_start_date' => $isProjectRelated && filled($validated['metadataProjectStartDate'] ?? null) ? $validated['metadataProjectStartDate'] : null,
-            'target_completion_date' => $isProjectRelated && filled($validated['metadataTargetCompletionDate'] ?? null) ? $validated['metadataTargetCompletionDate'] : null,
-            'project_remarks' => $isProjectRelated && filled($validated['metadataProjectRemarks'] ?? null) ? $validated['metadataProjectRemarks'] : null,
-        ], [
-            'identity_changed' => $this->metadataIdentityChanged($documentYear),
-        ]);
-
-        if ($this->metadataSuggestedDocumentCategoryId !== null) {
-            $this->documentRecord->recordAudit($user, 'document_category_suggested', 'Document category suggested.', [
-                'suggested_category_id' => $this->metadataSuggestedDocumentCategoryId,
-                'rule_id' => $this->metadataCategorySuggestionRuleId,
-                'matched_terms' => $this->metadataCategorySuggestionTerms,
-                'reason' => $this->metadataCategorySuggestionReason,
+        DB::transaction(function () use ($user, $validated, $documentYear, $categoryWasOverridden, $isProjectRelated): void {
+            $previousSecondaryIds = $this->documentRecord->secondaryCategories()->pluck('document_categories.id')->all();
+            $secondaryIds = collect($validated['metadataSecondaryCategoryIds'])->map(fn ($id) => (int) $id)->reject(fn ($id) => $id === (int) $validated['metadataDocumentCategoryId'])->all();
+            $this->documentRecord->updateMetadata($user, [
+                'document_type_id' => (int) $validated['metadataDocumentTypeId'],
+                'document_category_id' => (int) $validated['metadataDocumentCategoryId'],
+                'suggested_document_category_id' => $this->metadataSuggestedDocumentCategoryId,
+                'category_suggestion_rule_id' => $this->metadataCategorySuggestionRuleId,
+                'category_suggestion_terms' => $this->metadataCategorySuggestionTerms === [] ? null : $this->metadataCategorySuggestionTerms,
+                'category_suggestion_reason' => $this->metadataCategorySuggestionReason,
+                'category_suggested_at' => $this->metadataSuggestedDocumentCategoryId === null ? null : now(),
+                'category_overridden_at' => $categoryWasOverridden ? now() : null,
+                'category_overridden_by_id' => $categoryWasOverridden ? $user->id : null,
+                'document_number' => $validated['metadataDocumentNumber'],
+                'document_year' => $documentYear,
+                'title' => $validated['metadataTitle'],
+                'document_date' => $validated['metadataDocumentDate'],
+                'subject' => $validated['metadataSubject'],
+                'keywords' => filled($validated['metadataKeywords'] ?? null) ? $validated['metadataKeywords'] : null,
+                'is_project_related' => $isProjectRelated,
+                'project_name' => $isProjectRelated && filled($validated['metadataProjectName'] ?? null) ? $validated['metadataProjectName'] : null,
+                'project_location' => $isProjectRelated && filled($validated['metadataProjectLocation'] ?? null) ? $validated['metadataProjectLocation'] : null,
+                'approved_budget' => $isProjectRelated && filled($validated['metadataApprovedBudget'] ?? null) ? $validated['metadataApprovedBudget'] : null,
+                'project_start_date' => $isProjectRelated && filled($validated['metadataProjectStartDate'] ?? null) ? $validated['metadataProjectStartDate'] : null,
+                'target_completion_date' => $isProjectRelated && filled($validated['metadataTargetCompletionDate'] ?? null) ? $validated['metadataTargetCompletionDate'] : null,
+                'project_remarks' => $isProjectRelated && filled($validated['metadataProjectRemarks'] ?? null) ? $validated['metadataProjectRemarks'] : null,
+            ], [
+                'identity_changed' => $this->metadataIdentityChanged($documentYear),
             ]);
-        }
 
-        if ($categoryWasOverridden) {
-            $this->documentRecord->recordAudit($user, 'document_category_overridden', $this->metadataSuggestedDocumentCategoryId === null
-                ? 'Document category manually assigned because no automatic rule matched.'
-                : 'Document category manually overridden.', [
-                'suggested_category_id' => $this->metadataSuggestedDocumentCategoryId,
-                'selected_category_id' => (int) $validated['metadataDocumentCategoryId'],
-                'rule_id' => $this->metadataCategorySuggestionRuleId,
-                'reason' => $this->metadataSuggestedDocumentCategoryId === null ? 'no_rule_matched' : 'manual_correction',
-            ]);
-        }
+            $this->documentRecord->secondaryCategories()->sync($secondaryIds);
+            if (array_diff($previousSecondaryIds, $secondaryIds) || array_diff($secondaryIds, $previousSecondaryIds)) {
+                $this->documentRecord->recordAudit($user, 'document_secondary_categories_updated', 'Document secondary categories updated.', ['before' => $previousSecondaryIds, 'after' => $secondaryIds]);
+            }
+
+            if ($this->metadataSuggestedDocumentCategoryId !== null) {
+                $this->documentRecord->recordAudit($user, 'document_category_suggested', 'Document category suggested.', [
+                    'suggested_category_id' => $this->metadataSuggestedDocumentCategoryId,
+                    'rule_id' => $this->metadataCategorySuggestionRuleId,
+                    'matched_terms' => $this->metadataCategorySuggestionTerms,
+                    'reason' => $this->metadataCategorySuggestionReason,
+                ]);
+            }
+
+            if ($categoryWasOverridden) {
+                $this->documentRecord->recordAudit($user, 'document_category_overridden', $this->metadataSuggestedDocumentCategoryId === null
+                    ? 'Document category manually assigned because no automatic rule matched.'
+                    : 'Document category manually overridden.', [
+                    'suggested_category_id' => $this->metadataSuggestedDocumentCategoryId,
+                    'selected_category_id' => (int) $validated['metadataDocumentCategoryId'],
+                    'rule_id' => $this->metadataCategorySuggestionRuleId,
+                    'reason' => $this->metadataSuggestedDocumentCategoryId === null ? 'no_rule_matched' : 'manual_correction',
+                ]);
+            }
+        });
 
         $this->editingMetadata = false;
         $this->metadataIdentityChangeConfirmed = false;
@@ -365,6 +380,14 @@ new #[Title('Document Record')] class extends Component
         $this->refreshDocument();
 
         Flux::toast(variant: 'success', text: __('Document approved and published.'));
+    }
+
+    public function setPublicListing(bool $listed): void
+    {
+        $this->authorize('managePublicListing', $this->documentRecord);
+        $this->documentRecord->setPublicListing($this->user(), $listed);
+        $this->refreshDocument();
+        Flux::toast(variant: 'success', text: $listed ? __('Document listed in the public library.') : __('Document removed from the public library.'));
     }
 
     public function archiveDocument(): void
@@ -476,7 +499,7 @@ new #[Title('Document Record')] class extends Component
     public function documentCategories(): EloquentCollection
     {
         return DocumentCategory::query()
-            ->where('is_active', true)
+            ->where(fn ($query) => $query->where('is_active', true)->orWhereIn('id', $this->documentRecord->secondaryCategories()->pluck('document_categories.id')->all()))
             ->orderBy('name')
             ->get();
     }
@@ -486,6 +509,7 @@ new #[Title('Document Record')] class extends Component
         $this->documentRecord->refresh()->load([
             'type',
             'category',
+            'secondaryCategories',
             'suggestedCategory',
             'categorySuggestionRule',
             'creator',
@@ -593,6 +617,20 @@ new #[Title('Document Record')] class extends Component
         </x-slot:actions>
     </x-page-header>
 
+    @can('managePublicListing', $documentRecord)
+        @if ($documentRecord->status === \App\Enums\DocumentStatus::Published && ! $documentRecord->residentDocumentRequest()->exists())
+            <div class="mb-5 rounded-xl border border-emerald-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+                <h2 class="font-semibold">{{ __('Public library') }}</h2>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ __('Review the approved PDF and its metadata for personal information before listing it publicly.') }}</p>
+                @if ($documentRecord->is_publicly_listed)
+                    <flux:button class="mt-3" wire:click="setPublicListing(false)">{{ __('Remove from public library') }}</flux:button>
+                @else
+                    <flux:button class="mt-3" wire:click="setPublicListing(true)" wire:confirm="{{ __('Have you reviewed the approved PDF and metadata for public access?') }}">{{ __('List in public library') }}</flux:button>
+                @endif
+                <flux:error name="workflow" />
+            </div>
+        @endif
+    @endcan
     <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div class="grid gap-5">
             <x-panel :title="__('Document metadata')" :description="__('Public-safe identity fields for the permanent verification page.')">
@@ -664,13 +702,24 @@ new #[Title('Document Record')] class extends Component
 
                                     <flux:select wire:model="metadataDocumentCategoryId">
                                         <flux:select.option value="">{{ __('Select primary category') }}</flux:select.option>
-                                        @foreach ($this->documentCategories as $documentCategory)
+                                        @foreach ($this->documentCategories->where('is_active', true) as $documentCategory)
                                             <flux:select.option :value="$documentCategory->id" wire:key="metadata-document-category-{{ $documentCategory->id }}">{{ $documentCategory->name }}</flux:select.option>
                                         @endforeach
                                     </flux:select>
                                 @endif
                                 <flux:error name="metadataDocumentCategoryId" />
                             </flux:field>
+
+                            <fieldset class="sm:col-span-2">
+                                <legend class="font-medium">{{ __('Additional categories') }}</legend>
+                                <p class="mb-2 text-sm text-slate-500">{{ __('Select any other applicable categories. The primary category is saved separately.') }}</p>
+                                <flux:checkbox.group wire:model="metadataSecondaryCategoryIds" class="grid gap-2 sm:grid-cols-2">
+                                    @foreach ($this->documentCategories as $documentCategory)
+                                        <flux:checkbox value="{{ $documentCategory->id }}" :label="$documentCategory->name . ($documentCategory->is_active ? '' : ' (' . __('inactive') . ')')" wire:key="metadata-secondary-category-{{ $documentCategory->id }}" />
+                                    @endforeach
+                                </flux:checkbox.group>
+                                <flux:error name="metadataSecondaryCategoryIds" /><flux:error name="metadataSecondaryCategoryIds.*" />
+                            </fieldset>
 
                             <flux:field class="sm:col-span-2">
                                 <flux:label>{{ __('Subject or description') }} <span class="text-red-600">*</span></flux:label>
@@ -746,7 +795,7 @@ new #[Title('Document Record')] class extends Component
                     </form>
                 @else
                     <dl class="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-                        @foreach ([['Document number', $documentRecord->document_number], ['Document type', $documentRecord->type->name], ['Primary category', $documentRecord->category->name], ['Document date', $documentRecord->document_date->toFormattedDateString()], ['Status', $documentRecord->status->label()], ['Created by', $documentRecord->creator->name]] as [$label, $value])
+                        @foreach ([['Document number', $documentRecord->document_number], ['Document type', $documentRecord->type->name], ['Primary category', $documentRecord->category->name], ['Additional categories', $documentRecord->secondaryCategories->pluck('name')->join(', ') ?: __('None')], ['Document date', $documentRecord->document_date->toFormattedDateString()], ['Status', $documentRecord->status->label()], ['Created by', $documentRecord->creator->name]] as [$label, $value])
                             <div class="border-b border-slate-100 pb-4 dark:border-slate-800" wire:key="metadata-{{ str($label)->slug() }}">
                                 <dt class="text-xs font-bold uppercase tracking-wider text-slate-400">{{ $label }}</dt>
                                 <dd class="mt-1.5 text-sm font-semibold text-slate-900 dark:text-white">{{ $value }}</dd>

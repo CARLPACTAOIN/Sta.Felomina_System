@@ -102,7 +102,7 @@
                                         <div class="mt-1 max-w-md truncate text-xs text-slate-500 dark:text-slate-400">{{ $document->title }}</div>
                                     </td>
                                     <td>{{ $document->type->name }}</td>
-                                    <td>{{ $document->category->name }}</td>
+                                    <td>{{ $document->categoryNames() }}</td>
                                     <td>{{ $document->document_date->toFormattedDateString() }}</td>
                                     <td><x-status-badge :status="$document->status->value" /></td>
                                     <td>

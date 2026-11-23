@@ -44,6 +44,7 @@
         @if (! $isPurokChairperson)
             <div class="grid gap-5 md:grid-cols-2">
                 <x-panel :title="__('Documents by Category')" :description="__('Distribution of official archived records by assigned category.')">
+                    <p class="text-xs text-slate-500">{{ __('Documents in multiple categories are counted in each category.') }}</p>
                     @if ($metrics['category_distribution']->isNotEmpty())
                         <div class="grid gap-3">
                             @foreach ($metrics['category_distribution'] as $cat)

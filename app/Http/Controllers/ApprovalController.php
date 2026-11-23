@@ -11,7 +11,7 @@ class ApprovalController extends Controller
     public function index(): View
     {
         $documents = DocumentRecord::query()
-            ->with(['type', 'category', 'creator', 'submitter'])
+            ->with(['type', 'category', 'secondaryCategories', 'creator', 'submitter'])
             ->where('status', DocumentStatus::PendingApproval)
             ->latest('submitted_at')
             ->latest('id')

@@ -7,13 +7,16 @@ use App\Notifications\DocumentWorkflowNotification;
 use App\Services\ResidentDocumentRequestService;
 use Database\Factories\DocumentRecordFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -23,6 +26,7 @@ use Throwable;
 
 /**
  * @property int $id
+ * @property bool $is_publicly_listed
  * @property int $document_type_id
  * @property int $document_category_id
  * @property int|null $suggested_document_category_id
@@ -76,6 +80,7 @@ use Throwable;
  * @property Carbon|null $updated_at
  * @property-read DocumentType $type
  * @property-read DocumentCategory $category
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, DocumentCategory> $secondaryCategories
  * @property-read DocumentCategory|null $suggestedCategory
  * @property-read CategorizationRule|null $categorySuggestionRule
  * @property-read User $creator
@@ -145,6 +150,30 @@ class DocumentRecord extends Model
     /** @use HasFactory<DocumentRecordFactory> */
     use HasFactory;
 
+    /** @param Builder<DocumentRecord> $query */
+    public function scopePublicLibrary(Builder $query): void
+    {
+        $query->where('is_publicly_listed', true)->where('status', DocumentStatus::Published->value)
+            ->whereDoesntHave('residentDocumentRequest')
+            ->whereHas('fileVersions', fn (Builder $versions) => $versions->where('is_current', true));
+    }
+
+    public function setPublicListing(User $actor, bool $listed): void
+    {
+        DB::transaction(function () use ($actor, $listed): void {
+            $document = self::query()->lockForUpdate()->findOrFail($this->id);
+            $version = $document->currentFileVersion();
+            if ($listed && ($document->status !== DocumentStatus::Published || $document->residentDocumentRequest()->exists() || ! $version || ! Storage::exists($version->file_path))) {
+                throw ValidationException::withMessages(['workflow' => 'Only published documents with an available approved PDF can be listed. Resident requests cannot be listed.']);
+            }
+            if ((bool) $document->is_publicly_listed === $listed) {
+                return;
+            }
+            $document->forceFill(['is_publicly_listed' => $listed])->save();
+            $document->recordAudit($actor, $listed ? 'document_listed_publicly' : 'document_unlisted_publicly', $listed ? 'Document listed in public library.' : 'Document removed from public library.');
+        });
+    }
+
     /**
      * @return BelongsTo<DocumentType, $this>
      */
@@ -159,6 +188,40 @@ class DocumentRecord extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(DocumentCategory::class, 'document_category_id');
+    }
+
+    /** @return BelongsToMany<DocumentCategory, $this> */
+    public function secondaryCategories(): BelongsToMany
+    {
+        return $this->belongsToMany(DocumentCategory::class, 'document_record_secondary_categories');
+    }
+
+    /** @param Builder<DocumentRecord> $query */
+    public function scopeInCategory(Builder $query, int $categoryId): void
+    {
+        $query->where(fn (Builder $query) => $query->where('document_category_id', $categoryId)
+            ->orWhereHas('secondaryCategories', fn (Builder $query) => $query->whereKey($categoryId)));
+    }
+
+    public function categoryNames(): string
+    {
+        return collect([$this->category->name])->concat($this->secondaryCategories->pluck('name'))->join(', ');
+    }
+
+    /**
+     * @param  Builder<DocumentRecord>  $query
+     * @return Collection<int, int>
+     */
+    public static function categoryCounts(Builder $query): Collection
+    {
+        $ids = (clone $query)->reorder()->select('document_records.id');
+        $primary = DB::table('document_records')->select('id as document_record_id', 'document_category_id')->whereIn('id', clone $ids);
+        $secondary = DB::table('document_record_secondary_categories')->select('document_record_id', 'document_category_id')->whereIn('document_record_id', clone $ids);
+
+        return DB::query()->fromSub($primary->union($secondary), 'assignments')
+            ->select('document_category_id', DB::raw('count(*) as aggregate'))
+            ->groupBy('document_category_id')->pluck('aggregate', 'document_category_id')
+            ->map(fn ($count): int => (int) $count);
     }
 
     /**
@@ -623,6 +686,7 @@ class DocumentRecord extends Model
     protected function casts(): array
     {
         return [
+            'is_publicly_listed' => 'boolean',
             'document_date' => 'date',
             'is_project_related' => 'boolean',
             'approved_budget' => 'decimal:2',

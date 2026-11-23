@@ -22,6 +22,8 @@ new #[Title('Create Document Record')] class extends Component
 {
     public string $documentTypeId = '';
     public string $documentCategoryId = '';
+    /** @var array<int, string> */
+    public array $secondaryCategoryIds = [];
     public ?int $suggestedDocumentCategoryId = null;
     public ?int $categorySuggestionRuleId = null;
     /** @var array<int, string> */
@@ -133,6 +135,8 @@ new #[Title('Create Document Record')] class extends Component
                 'integer',
                 Rule::exists('document_categories', 'id')->where('is_active', true),
             ],
+            'secondaryCategoryIds' => ['array'],
+            'secondaryCategoryIds.*' => ['integer', 'distinct', Rule::exists('document_categories', 'id')->where('is_active', true)],
             'documentNumber' => ['required', 'string', 'max:64'],
             'title' => ['required', 'string', 'max:255'],
             'documentDate' => ['required', 'date'],
@@ -229,6 +233,12 @@ new #[Title('Create Document Record')] class extends Component
             $request = ResidentDocumentRequest::query()->findOrFail($this->residentDocumentRequestId);
             abort_unless($user->can('process', $request), 404);
             app(ResidentDocumentRequestService::class)->linkDocument($user, $request, $document);
+            }
+
+            $secondaryIds = collect($validated['secondaryCategoryIds'])->map(fn ($id) => (int) $id)->reject(fn ($id) => $id === (int) $validated['documentCategoryId'])->all();
+            $document->secondaryCategories()->sync($secondaryIds);
+            if ($secondaryIds !== []) {
+                $document->recordAudit($user, 'document_secondary_categories_updated', 'Document secondary categories updated.', ['before' => [], 'after' => $secondaryIds]);
             }
 
             return $document;
@@ -412,6 +422,17 @@ new #[Title('Create Document Record')] class extends Component
                     @endif
                     <flux:error name="documentCategoryId" />
                 </flux:field>
+
+                <fieldset class="sm:col-span-2">
+                    <legend class="font-medium">{{ __('Additional categories') }}</legend>
+                    <p class="mb-2 text-sm text-slate-500">{{ __('Select any other applicable categories. The primary category is saved separately.') }}</p>
+                    <flux:checkbox.group wire:model="secondaryCategoryIds" class="grid gap-2 sm:grid-cols-2">
+                        @foreach ($this->documentCategories as $documentCategory)
+                            <flux:checkbox value="{{ $documentCategory->id }}" :label="$documentCategory->name" wire:key="secondary-category-{{ $documentCategory->id }}" />
+                        @endforeach
+                    </flux:checkbox.group>
+                    <flux:error name="secondaryCategoryIds" /><flux:error name="secondaryCategoryIds.*" />
+                </fieldset>
 
                 <flux:field class="sm:col-span-2">
                     <flux:label>{{ __('Subject or description') }} <span class="text-red-600">*</span></flux:label>

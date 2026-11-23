@@ -31,7 +31,7 @@ class ReportEngine
     {
         abort_unless($user->can(StaffPermission::ViewDocumentReports->value), 403, 'Unauthorized to view document reports.');
 
-        $query = DocumentRecord::query()->with(['type', 'category', 'creator', 'approver']);
+        $query = DocumentRecord::query()->with(['type', 'category', 'secondaryCategories', 'creator', 'approver']);
 
         $year = ! empty($filters['year']) ? (int) $filters['year'] : null;
         $month = ! empty($filters['month']) ? (int) $filters['month'] : null;
@@ -50,7 +50,7 @@ class ReportEngine
         }
 
         if ($categoryId !== null) {
-            $query->where('document_category_id', $categoryId);
+            $query->inCategory($categoryId);
         }
 
         if ($typeId !== null) {
@@ -85,20 +85,9 @@ class ReportEngine
         }
 
         // Calculate dominant category
-        $topCategory = (clone $query)
-            ->reorder()
-            ->select('document_category_id', DB::raw('count(*) as count'))
-            ->groupBy('document_category_id')
-            ->orderByDesc('count')
-            ->first();
-
-        $dominantCategory = 'None';
-        if ($topCategory !== null) {
-            $cat = DocumentCategory::find($topCategory->document_category_id);
-            if ($cat !== null) {
-                $dominantCategory = $cat->name;
-            }
-        }
+        $counts = DocumentRecord::categoryCounts($query);
+        $topCategoryId = $counts->sortDesc()->keys()->first();
+        $dominantCategory = $topCategoryId === null ? 'None' : (DocumentCategory::query()->whereKey($topCategoryId)->value('name') ?? 'None');
 
         // Determine period label
         $periodLabel = $this->buildDocumentPeriodLabel($year, $month, $dateFrom, $dateTo);

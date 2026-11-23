@@ -48,10 +48,7 @@ class DashboardMetricsService
             ->groupBy('status')
             ->pluck('aggregate', 'status');
 
-        $categoryCounts = DocumentRecord::query()
-            ->select('document_category_id', DB::raw('count(*) as aggregate'))
-            ->groupBy('document_category_id')
-            ->pluck('aggregate', 'document_category_id');
+        $categoryCounts = DocumentRecord::categoryCounts(DocumentRecord::query());
 
         $categories = DocumentCategory::query()
             ->orderBy('name')

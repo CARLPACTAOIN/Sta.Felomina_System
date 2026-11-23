@@ -406,7 +406,7 @@
                                 <div style="font-size: 8pt; color: #64748b; margin-top: 2px;">{{ $doc->subject }}</div>
                             </td>
                             <td>{{ $doc->type->name }}</td>
-                            <td>{{ $doc->category->name }}</td>
+                            <td>{{ $doc->categoryNames() }}</td>
                             <td>{{ $doc->document_date->format('M d, Y') }}</td>
                             <td style="text-align: center;">
                                 <span class="badge">{{ $doc->status->label() }}</span>

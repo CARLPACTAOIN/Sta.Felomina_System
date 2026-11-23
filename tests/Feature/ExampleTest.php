@@ -1,7 +1,5 @@
 <?php
 
-test('home redirects staff to the sign-in page', function () {
-    $response = $this->get(route('home'));
-
-    $response->assertRedirect(route('login'));
+test('home displays the public library', function () {
+    $this->get(route('home'))->assertOk()->assertSee('Published documents');
 });

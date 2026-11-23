@@ -33,7 +33,7 @@
                                     </td>
                                     <td class="px-4 py-4 text-slate-600 dark:text-slate-300">
                                         <p>{{ $document->type->name }}</p>
-                                        <p class="mt-1 text-xs text-slate-500">{{ $document->category->name }}</p>
+                                        <p class="mt-1 text-xs text-slate-500">{{ $document->categoryNames() }}</p>
                                     </td>
                                     <td class="px-4 py-4 text-slate-600 dark:text-slate-300">
                                         <p>{{ $document->submitted_at?->toDayDateTimeString() ?? __('Not recorded') }}</p>
